@@ -1,12 +1,18 @@
 /* ══════════════════════════════════════════════════════════════════
    PRE-TEST BIMTEK eMonDAK — logika aplikasi
 
+   Alurnya:
+     akun  →  lobi (token sesi + hitung mundur)  →  ujian  →  hasil
+   Ujian dikerjakan serentak dalam jendela waktu yang dibuka admin,
+   satu butir satu layar dengan hitung mundur dan poin kecepatan.
+
    Susunan berkas ini:
-     1. Perkakas kecil (escape, acak, waktu, SHA-256)
+     1. Perkakas kecil (escape, acak, waktu, SHA-256, suara)
      2. Latar video hero
-     3. Penyimpanan sesi peserta (tahan muat ulang halaman)
+     3. Keadaan aplikasi (akun, sesi ujian) — tahan muat ulang halaman
      4. Perute halaman (#/…)
-     5. Halaman: Cara Ikut, Masuk, Ujian, Hasil, Peringkat, Admin, Bantuan
+     5. Halaman: Cara Ikut, Akun, Lobi, Ujian, Hasil, Peringkat,
+        Admin, Bantuan
    ══════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -34,12 +40,19 @@
     return a;
   }
 
-  const HURUF = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const BENTUK = ['▲', '◆', '●', '■'];
+  const WARNA_UBIN = ['merah', 'biru', 'kuning', 'hijau'];
 
   function mmss(detik) {
     const d = Math.max(0, Math.round(detik));
     const m = Math.floor(d / 60);
     return String(m).padStart(2, '0') + ':' + String(d % 60).padStart(2, '0');
+  }
+
+  function hitungMundurPanjang(ms) {
+    const d = Math.max(0, Math.round(ms / 1000));
+    const jam = Math.floor(d / 3600);
+    return (jam > 0 ? jam + ' jam ' : '') + mmss(d % 3600);
   }
 
   function tanggalIndo(iso) {
@@ -51,6 +64,17 @@
       hour: '2-digit', minute: '2-digit'
     });
   }
+
+  // ISO → nilai untuk <input type="datetime-local"> (waktu setempat)
+  function keInputWaktu(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  const angkaRapi = (n) => Number(n || 0).toLocaleString('id-ID');
 
   // SHA-256: pakai Web Crypto bila tersedia; bila tidak (mis. halaman
   // dibuka lewat file://), jatuh ke penghitungan murni JavaScript.
@@ -112,6 +136,33 @@
     return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
   }
 
+  /* ── Suara (mati secara bawaan) ──────────────────────────────── */
+
+  const Suara = {
+    get nyala() { return localStorage.getItem('pretest_suara') === '1'; },
+    set nyala(v) { localStorage.setItem('pretest_suara', v ? '1' : '0'); },
+    _ctx: null,
+    nada(frek, lama, jenis) {
+      if (!this.nyala) return;
+      try {
+        this._ctx = this._ctx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = this._ctx.createOscillator();
+        const g = this._ctx.createGain();
+        o.type = jenis || 'triangle';
+        o.frequency.value = frek;
+        g.gain.setValueAtTime(0.0001, this._ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.16, this._ctx.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, this._ctx.currentTime + lama);
+        o.connect(g).connect(this._ctx.destination);
+        o.start();
+        o.stop(this._ctx.currentTime + lama);
+      } catch { /* peramban menolak audio — abaikan */ }
+    },
+    benar() { this.nada(880, .18); setTimeout(() => this.nada(1320, .22), 90); },
+    salah() { this.nada(220, .3, 'sawtooth'); },
+    tik()   { this.nada(1500, .05, 'square'); }
+  };
+
   /* ── 2. Latar video hero ─────────────────────────────────────── */
 
   (function nyalakanVideo() {
@@ -126,52 +177,70 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) jalan(); });
   })();
 
-  /* ── 3. Sesi peserta ─────────────────────────────────────────── */
+  /* ── 3. Keadaan aplikasi ─────────────────────────────────────── */
 
-  const KUNCI_SESI = 'pretest_sesi_v1';
-  const KUNCI_HASIL = 'pretest_hasil_v1';
-  let sesi = null;   // { peserta, butir[], jawaban{}, mulai }
-  let hasil = null;  // { skor, benar, total, durasiDetik, rincian[], peserta }
+  const KUNCI_AKUN_SAYA = 'pretest_akun_saya';
+  const KUNCI_MAIN = 'pretest_main_v2';
+  const KUNCI_HASIL_SESI = 'pretest_hasil_v2';
+
+  let akun = null;    // { nama, email, instansi, jabatan }
+  let main = null;    // keadaan ujian yang sedang berjalan
+  let hasil = null;   // hasil terakhir
+  let sesi = null;    // dokumen sesi dari Firestore
+  let lepasPantau = null; // penghenti langganan onSnapshot halaman aktif
   let jamId = null;
 
-  function muatSesi() {
-    try { sesi = JSON.parse(sessionStorage.getItem(KUNCI_SESI)) || null; } catch { sesi = null; }
-    try { hasil = JSON.parse(sessionStorage.getItem(KUNCI_HASIL)) || null; } catch { hasil = null; }
+  function muatKeadaan() {
+    try { akun = JSON.parse(localStorage.getItem(KUNCI_AKUN_SAYA)) || null; } catch { akun = null; }
+    try { main = JSON.parse(sessionStorage.getItem(KUNCI_MAIN)) || null; } catch { main = null; }
+    try { hasil = JSON.parse(sessionStorage.getItem(KUNCI_HASIL_SESI)) || null; } catch { hasil = null; }
   }
-  function simpanSesi() {
-    if (sesi) sessionStorage.setItem(KUNCI_SESI, JSON.stringify(sesi));
-    else sessionStorage.removeItem(KUNCI_SESI);
-  }
-  function simpanHasilSesi() {
-    if (hasil) sessionStorage.setItem(KUNCI_HASIL, JSON.stringify(hasil));
-    else sessionStorage.removeItem(KUNCI_HASIL);
-  }
+  const simpanAkunLokal = () => akun
+    ? localStorage.setItem(KUNCI_AKUN_SAYA, JSON.stringify(akun))
+    : localStorage.removeItem(KUNCI_AKUN_SAYA);
+  const simpanMain = () => main
+    ? sessionStorage.setItem(KUNCI_MAIN, JSON.stringify(main))
+    : sessionStorage.removeItem(KUNCI_MAIN);
+  const simpanHasilSesi = () => hasil
+    ? sessionStorage.setItem(KUNCI_HASIL_SESI, JSON.stringify(hasil))
+    : sessionStorage.removeItem(KUNCI_HASIL_SESI);
 
-  function soalDari(id) { return BANK.find(s => s.id === id); }
+  const soalDari = (id) => BANK.find(s => s.id === id);
 
-  // Undi butir: satu wakil per grup, lalu diacak dan dipotong sebanyak
-  // jumlahSoal. Urutan opsi tiap butir ikut diacak bila diminta.
-  function undiButir() {
+  // Undi butir: satu wakil per grup soal kembar, lalu diacak dan dipotong.
+  function undiButir(jumlah) {
     const perGrup = new Map();
     for (const s of BANK) {
       const g = s.grup || s.id;
       if (!perGrup.has(g)) perGrup.set(g, []);
       perGrup.get(g).push(s);
     }
-    const wakil = [...perGrup.values()].map(daftar => daftar[Math.floor(Math.random() * daftar.length)]);
-    const jumlah = Math.min(K.jumlahSoal || 20, wakil.length);
-    return acak(wakil).slice(0, jumlah).map(s => ({
+    const wakil = [...perGrup.values()].map(d => d[Math.floor(Math.random() * d.length)]);
+    return acak(wakil).slice(0, Math.min(jumlah || 20, wakil.length)).map(s => ({
       id: s.id,
-      urut: K.acakOpsi === false ? s.o.map((_, i) => i) : acak(s.o.map((_, i) => i))
+      urut: acak(s.o.map((_, i) => i))
     }));
+  }
+
+  /* Keadaan sesi terhadap waktu sekarang. */
+  function statusSesi(s) {
+    if (!s) return { keadaan: 'kosong', teks: 'Belum ada sesi yang dijadwalkan panitia.' };
+    const kini = Date.now();
+    const mulai = s.mulai ? new Date(s.mulai).getTime() : null;
+    const selesai = s.selesai ? new Date(s.selesai).getTime() : null;
+    if (!s.aktif) return { keadaan: 'tutup', teks: 'Sesi belum dibuka panitia.' };
+    if (mulai && kini < mulai) return { keadaan: 'menunggu', mulai, selesai, sisaMulai: mulai - kini };
+    if (selesai && kini > selesai) return { keadaan: 'lewat', teks: 'Waktu sesi sudah berakhir.' };
+    return { keadaan: 'buka', mulai, selesai, sisaTutup: selesai ? selesai - kini : null };
   }
 
   /* ── 4. Perute ───────────────────────────────────────────────── */
 
   const RUTE = {
-    '#/': null,               // beranda = hero
+    '#/': null,
     '#/cara': halamanCara,
-    '#/masuk': halamanMasuk,
+    '#/akun': halamanAkun,
+    '#/lobi': halamanLobi,
     '#/tes': halamanTes,
     '#/hasil': halamanHasil,
     '#/peringkat': halamanPeringkat,
@@ -186,24 +255,24 @@
 
   function render() {
     if (jamId) { clearInterval(jamId); jamId = null; }
-    const rute = location.hash || '#/';
-    const fn = RUTE[rute];
+    if (lepasPantau) { lepasPantau(); lepasPantau = null; }
+
+    const fn = RUTE[location.hash || '#/'];
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     if (!fn) {
       hero.hidden = false;
       halaman.hidden = true;
       halaman.innerHTML = '';
-      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
     hero.hidden = true;
     halaman.hidden = false;
     halaman.innerHTML = '';
-    window.scrollTo({ top: 0, behavior: 'auto' });
     fn();
   }
 
-  function kop(judul) {
+  function kop(judul, ringkas) {
     return `
       <header class="kop">
         <a class="merek" href="#/">
@@ -212,318 +281,553 @@
             <small>${aman(judul || 'Pre-Test BIMTEK')}</small>
           </span>
         </a>
+        ${ringkas ? '' : `
         <div class="nav-kanan">
           <a href="#/cara">Cara Ikut</a>
           <a href="#/peringkat">Peringkat</a>
           <a href="#/admin">Admin</a>
           <a href="#/bantuan">Bantuan</a>
-          <a class="tombol-kaca" href="#/">Beranda</a>
-        </div>
+          ${akun
+            ? `<a class="tombol-kaca" href="#/lobi">${aman(akun.nama.split(' ')[0])}</a>`
+            : `<a class="tombol-kaca" href="#/akun">Masuk</a>`}
+        </div>`}
       </header>`;
   }
 
-  /* ── 5a. Halaman: Cara Ikut ──────────────────────────────────── */
+  /* ── 5a. Cara Ikut ───────────────────────────────────────────── */
 
   function halamanCara() {
     halaman.innerHTML = kop('Cara Ikut') + `
       <div class="wadah">
         <div class="label-sudut">Panduan Peserta</div>
-        <h1 class="judul-halaman">Empat langkah, <em>selesai dalam ${K.batasMenit || 25} menit</em></h1>
+        <h1 class="judul-halaman">Empat langkah, <em>dikerjakan serentak</em></h1>
         <p class="ket-halaman">
           Pre-test ini mengukur pemahaman awal Anda tentang aplikasi eMonitoring DAK
           sebelum materi bimtek dimulai. Tidak ada nilai minimal kelulusan — hasilnya
           dipakai penyelenggara untuk menakar titik berat pembahasan di kelas.
         </p>
         <ol class="langkah">
-          <li><strong>Siapkan token</strong>Token dibagikan panitia di kelas atau lewat grup WhatsApp angkatan. Tanpa token, halaman ujian tidak terbuka.</li>
-          <li><strong>Isi identitas</strong>Nama lengkap, email aktif, dan instansi asal. Tidak ada kata sandi — email Anda sekaligus menjadi penanda peserta.</li>
-          <li><strong>Kerjakan ${K.jumlahSoal || 20} soal</strong>Pilihan ganda, ${K.batasMenit ? 'berbatas waktu ' + K.batasMenit + ' menit' : 'tanpa batas waktu'}. Jawaban tersimpan otomatis, jadi halaman boleh dimuat ulang tanpa kehilangan progres.</li>
-          <li><strong>Lihat nilai &amp; peringkat</strong>Nilai, pembahasan, dan posisi Anda di papan peringkat muncul segera setelah lembar jawaban dikirim.</li>
+          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun itu dipakai lagi pada post-test nanti.</li>
+          <li><strong>Tunggu di lobi</strong>Masukkan token sesi yang dibagikan panitia. Token hanya berlaku pada jendela waktu yang dibuka admin, jadi seluruh kelas mulai bersama-sama.</li>
+          <li><strong>Jawab secepat mungkin</strong>Satu layar satu soal dengan hitung mundur. Jawaban benar bernilai poin, dan makin cepat menjawab makin besar poinnya — jawaban beruntun dapat bonus.</li>
+          <li><strong>Lihat papan juara</strong>Nilai, poin, pembahasan, dan posisi Anda muncul begitu soal terakhir lewat. Tiga besar naik podium.</li>
         </ol>
         <p class="ket-halaman" style="margin-top:22px">
-          Satu email hanya dapat mengerjakan <b>satu kali</b>. Bila terjadi kendala,
+          Satu email hanya dapat mengerjakan <b>satu kali per sesi</b>. Bila terjadi kendala,
           hubungi panitia lewat halaman <a href="#/bantuan">Bantuan</a>.
         </p>
-        <a class="btn btn-kuning" href="#/masuk">Mulai sekarang</a>
+        <a class="btn btn-kuning" href="#/akun">${akun ? 'Lanjut ke lobi' : 'Buat akun sekarang'}</a>
       </div>`;
   }
 
-  /* ── 5b. Halaman: Masuk ──────────────────────────────────────── */
+  /* ── 5b. Akun peserta ────────────────────────────────────────── */
 
-  function halamanMasuk() {
-    halaman.innerHTML = kop('Masuk Peserta') + `
+  function halamanAkun() {
+    halaman.innerHTML = kop('Akun Peserta') + `
       <div class="wadah wadah-sempit">
-        <div class="label-sudut">Identitas Peserta</div>
+        <div class="label-sudut">Akun Daerah</div>
         <h1 class="judul-halaman">Masuk tanpa <em>kata sandi</em></h1>
         <p class="ket-halaman">
-          Cukup nama, email, instansi asal, dan token dari panitia.
+          Ketik email Anda. Bila sudah pernah terdaftar, datanya langsung dikenali;
+          bila belum, isi sekali dan akun itu tersimpan untuk pre-test maupun post-test.
         </p>
-        <div class="kartu">
-          <form class="formulir" id="formMasuk" novalidate>
-            <div class="kolom">
-              <label for="fNama">Nama lengkap</label>
-              <input id="fNama" name="nama" type="text" autocomplete="name" placeholder="mis. Budi Santoso, S.T." required />
+
+        ${akun ? `
+          <div class="kartu kartu-akun" style="margin-bottom:18px">
+            <div class="label-sudut" style="margin:0 0 8px">Akun tersimpan di perangkat ini</div>
+            <div class="akun-nama">${aman(akun.nama)}</div>
+            <div class="akun-rinci">${aman(akun.instansi)}<br>${aman(akun.email)}</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+              <a class="btn btn-kuning" href="#/lobi">Lanjut ke lobi ujian</a>
+              <button class="btn btn-hantu" id="btnGanti">Ganti akun</button>
             </div>
+          </div>` : ''}
+
+        <div class="kartu" id="kartuForm"${akun ? ' hidden' : ''}>
+          <form class="formulir" id="formAkun" novalidate>
             <div class="kolom">
               <label for="fEmail">Email aktif</label>
               <input id="fEmail" name="email" type="email" autocomplete="email" placeholder="nama@instansi.go.id" required />
-              <span class="petunjuk">Dipakai sebagai penanda peserta — satu email satu kali kerjakan.</span>
+              <span class="petunjuk">Penanda peserta — dipakai lagi pada post-test.</span>
             </div>
-            <div class="kolom">
-              <label for="fInstansi">Instansi asal</label>
-              <input id="fInstansi" name="instansi" type="text" placeholder="mis. Dinas PUPR Kab. Deli Serdang" required />
+            <div id="isianBaru" hidden>
+              <div class="kolom">
+                <label for="fNama">Nama lengkap</label>
+                <input id="fNama" name="nama" type="text" autocomplete="name" placeholder="mis. Budi Santoso, S.T." />
+              </div>
+              <div class="kolom" style="margin-top:16px">
+                <label for="fInstansi">Instansi asal</label>
+                <input id="fInstansi" name="instansi" type="text" placeholder="mis. Dinas PUPR Kab. Deli Serdang" />
+              </div>
+              <div class="kolom" style="margin-top:16px">
+                <label for="fJabatan">Jabatan <span style="text-transform:none;letter-spacing:0">(boleh dikosongkan)</span></label>
+                <input id="fJabatan" name="jabatan" type="text" placeholder="mis. Operator eMonDAK" />
+              </div>
             </div>
-            <div class="kolom">
-              <label for="fToken">Token bimtek</label>
-              <input id="fToken" name="token" type="text" autocapitalize="characters" spellcheck="false" placeholder="mis. BIMTEK2026" required />
-              <span class="petunjuk">Dibagikan panitia di kelas.</span>
-            </div>
-            <button class="btn btn-biru btn-blok" type="submit" id="btnMasuk">Masuk &amp; mulai mengerjakan</button>
+            <button class="btn btn-biru btn-blok" type="submit" id="btnAkun">Lanjut</button>
           </form>
-          <div id="pesanMasuk"></div>
+          <div id="pesanAkun"></div>
         </div>
       </div>`;
 
-    const form = $('#formMasuk');
-    const kotakPesan = $('#pesanMasuk');
-    const tombol = $('#btnMasuk');
+    const ganti = $('#btnGanti');
+    if (ganti) ganti.onclick = () => {
+      akun = null; simpanAkunLokal();
+      main = null; simpanMain();
+      render();
+    };
+
+    const form = $('#formAkun');
+    if (!form) return;
+    const kotak = $('#pesanAkun');
+    const tombol = $('#btnAkun');
+    let tahapDua = false;
 
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      kotakPesan.innerHTML = '';
+      kotak.innerHTML = '';
+      const email = form.email.value.trim();
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        kotak.innerHTML = '<div class="pesan pesan-galat">Alamat email belum benar.</div>';
+        return;
+      }
+
+      if (!tahapDua) {
+        tombol.disabled = true; tombol.textContent = 'Memeriksa…';
+        let ada = null;
+        try { ada = await window.DB.ambilAkun(email); }
+        catch (e) { console.warn('[akun] gagal memeriksa:', e); }
+        tombol.disabled = false;
+
+        if (ada) {
+          akun = { nama: ada.nama, email: ada.email, instansi: ada.instansi, jabatan: ada.jabatan || '' };
+          simpanAkunLokal();
+          ke('#/lobi');
+          return;
+        }
+        tahapDua = true;
+        $('#isianBaru').hidden = false;
+        tombol.textContent = 'Daftarkan akun';
+        kotak.innerHTML = '<div class="pesan pesan-info">Email ini belum terdaftar. Lengkapi nama dan instansi untuk membuat akun.</div>';
+        $('#fNama').focus();
+        return;
+      }
 
       const nama = form.nama.value.trim();
-      const email = form.email.value.trim();
       const instansi = form.instansi.value.trim();
-      const token = form.token.value.trim();
+      const jabatan = form.jabatan.value.trim();
+      if (nama.length < 3) { kotak.innerHTML = '<div class="pesan pesan-galat">Nama lengkap belum diisi dengan benar.</div>'; return; }
+      if (instansi.length < 3) { kotak.innerHTML = '<div class="pesan pesan-galat">Instansi asal belum diisi.</div>'; return; }
 
-      const galat = (t) => {
-        kotakPesan.innerHTML = `<div class="pesan pesan-galat">${t}</div>`;
-        tombol.disabled = false;
-        tombol.textContent = 'Masuk & mulai mengerjakan';
-      };
-
-      if (nama.length < 3) return galat('Nama lengkap belum diisi dengan benar.');
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return galat('Alamat email belum benar.');
-      if (instansi.length < 3) return galat('Instansi asal belum diisi.');
-
-      const daftarToken = (K.tokenPeserta || []).map(t => String(t).trim().toLowerCase());
-      if (!daftarToken.includes(token.toLowerCase())) {
-        return galat('Token tidak dikenali. Periksa kembali token yang dibagikan panitia.');
-      }
-
-      tombol.disabled = true;
-      tombol.textContent = 'Memeriksa…';
-
+      tombol.disabled = true; tombol.textContent = 'Menyimpan…';
       try {
-        if (await window.DB.emailSudahIkut(email)) {
-          return galat('Email ini sudah pernah mengerjakan pre-test. ' +
-            'Lihat posisi Anda di <a href="#/peringkat">papan peringkat</a>.');
-        }
+        await window.DB.simpanAkun({ nama, email, instansi, jabatan });
       } catch (e) {
-        console.warn('[masuk] gagal memeriksa email:', e);
+        console.warn('[akun] gagal menyimpan:', e);
+        kotak.innerHTML = '<div class="pesan pesan-galat">Akun gagal disimpan ke server. Periksa sambungan internet lalu coba lagi.</div>';
+        tombol.disabled = false; tombol.textContent = 'Daftarkan akun';
+        return;
       }
-
-      sesi = {
-        peserta: { nama, email, instansi, token },
-        butir: undiButir(),
-        jawaban: {},
-        indeks: 0,
-        mulai: Date.now()
-      };
-      hasil = null;
-      simpanHasilSesi();
-      simpanSesi();
-      ke('#/tes');
+      akun = { nama, email, instansi, jabatan };
+      simpanAkunLokal();
+      ke('#/lobi');
     });
   }
 
-  /* ── 5c. Halaman: Ujian ──────────────────────────────────────── */
+  /* ── 5c. Lobi ────────────────────────────────────────────────── */
 
-  function halamanTes() {
-    if (!sesi) { ke('#/masuk'); return; }
+  function halamanLobi() {
+    if (!akun) { ke('#/akun'); return; }
 
-    halaman.innerHTML = kop('Lembar Ujian') + `
-      <div class="wadah">
-        <div class="bilah-ujian">
-          <div>
-            <div class="label-sudut" style="margin-bottom:4px">${aman(K.namaSesi || 'Pre-Test')}</div>
-            <div style="font-size:14px;color:var(--teks-lembut)">
-              ${aman(sesi.peserta.nama)} — ${aman(sesi.peserta.instansi)}
-            </div>
-          </div>
-          <div class="jam" id="jam">${K.batasMenit ? '--:--' : '00:00'}</div>
+    halaman.innerHTML = kop('Lobi Ujian') + `
+      <div class="wadah wadah-sempit">
+        <div class="label-sudut">Lobi</div>
+        <h1 class="judul-halaman">Halo, <em>${aman(akun.nama.split(' ')[0])}</em></h1>
+        <p class="ket-halaman">${aman(akun.instansi)}</p>
+        <div class="kartu" id="kartuLobi">
+          <div class="kosong">Menghubungi ruang sesi…</div>
         </div>
-        <div class="rel"><span id="rel" style="width:0%"></span></div>
-        <div class="kartu" id="kartuSoal"></div>
-        <div class="peta-soal" id="petaSoal"></div>
       </div>`;
 
+    // Sesi dipantau langsung: begitu admin menekan "Buka", layar ini ikut
+    // berubah tanpa perlu dimuat ulang.
+    lobiTergambar = null;
+    lepasPantau = window.DB.pantauSesi((dok) => { sesi = dok; gambarLobi(); });
+    jamId = setInterval(() => { if (location.hash === '#/lobi') gambarLobi(); }, 1000);
+  }
+
+  // Lobi berdenyut tiap detik. Supaya kotak token tidak dibangun ulang terus
+  // (ketikan peserta akan hilang), isi kartu hanya digambar ulang bila keadaan
+  // sesinya berubah; selebihnya cukup angka hitung mundurnya yang diperbarui.
+  let lobiTergambar = null;
+
+  function gambarLobi() {
+    const kotak = $('#kartuLobi');
+    if (!kotak) return;
+    const st = statusSesi(sesi);
+
+    const tanda = st.keadaan + '|' + JSON.stringify(sesi ? [
+      sesi.judul, sesi.token, sesi.jumlahSoal, sesi.detikPerSoal,
+      sesi.mulai, sesi.selesai, sesi.aktif
+    ] : null);
+
+    if (tanda === lobiTergambar) {
+      const mundur = $('#lobiMundur');
+      if (mundur && st.sisaMulai != null) mundur.textContent = hitungMundurPanjang(st.sisaMulai);
+      const tutup = $('#lobiTutup');
+      if (tutup && st.sisaTutup != null) tutup.textContent = 'Ditutup dalam ' + hitungMundurPanjang(st.sisaTutup);
+      return;
+    }
+    lobiTergambar = tanda;
+
+    const kepala = sesi ? `
+      <div class="sesi-judul">${aman(sesi.judul || K.namaSesi)}</div>
+      <div class="sesi-rinci">
+        ${sesi.jumlahSoal || 20} soal · ${sesi.detikPerSoal || 30} detik per soal
+        ${sesi.mulai ? ' · mulai ' + aman(tanggalIndo(sesi.mulai)) : ''}
+      </div>` : '';
+
+    if (st.keadaan === 'kosong' || st.keadaan === 'tutup') {
+      kotak.innerHTML = kepala + `
+        <div class="lampu lampu-tutup"><span></span> ${aman(st.teks)}</div>
+        <p class="ket-halaman" style="margin:14px 0 0">
+          Biarkan halaman ini terbuka — begitu panitia membuka sesi, layar akan berubah sendiri.
+        </p>`;
+      return;
+    }
+
+    if (st.keadaan === 'lewat') {
+      kotak.innerHTML = kepala + `
+        <div class="lampu lampu-tutup"><span></span> Waktu sesi sudah berakhir.</div>
+        <div style="margin-top:14px"><a class="btn btn-hantu" href="#/peringkat">Lihat papan peringkat</a></div>`;
+      return;
+    }
+
+    if (st.keadaan === 'menunggu') {
+      kotak.innerHTML = kepala + `
+        <div class="lampu lampu-tunggu"><span></span> Sesi dibuka sebentar lagi</div>
+        <div class="mundur-besar" id="lobiMundur">${hitungMundurPanjang(st.sisaMulai)}</div>
+        <p class="ket-halaman" style="margin:6px 0 0">Bersiap — layar ujian terbuka otomatis.</p>`;
+      return;
+    }
+
+    // terbuka: minta token
+    kotak.innerHTML = kepala + `
+      <div class="lampu lampu-buka"><span></span> Sesi sedang dibuka</div>
+      <div class="sesi-rinci" id="lobiTutup" style="margin:10px 0 0">${
+        st.sisaTutup != null ? 'Ditutup dalam ' + hitungMundurPanjang(st.sisaTutup) : ''}</div>
+      <form class="formulir" id="formToken" style="margin-top:18px" novalidate>
+        <div class="kolom">
+          <label for="fToken">Token sesi</label>
+          <input id="fToken" class="masukan-token" type="text" autocapitalize="characters"
+                 spellcheck="false" placeholder="TOKEN" required />
+          <span class="petunjuk">Dibagikan panitia di kelas.</span>
+        </div>
+        <button class="btn btn-kuning btn-blok" type="submit">Masuk ruang ujian</button>
+      </form>
+      <div id="pesanToken"></div>`;
+
+    $('#formToken').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const isi = $('#fToken').value.trim();
+      const kotakPesan = $('#pesanToken');
+      if (isi.toLowerCase() !== String(sesi.token || '').trim().toLowerCase()) {
+        kotakPesan.innerHTML = '<div class="pesan pesan-galat">Token tidak cocok dengan sesi yang sedang dibuka.</div>';
+        return;
+      }
+      kotakPesan.innerHTML = '';
+      try {
+        if (await window.DB.emailSudahIkut(akun.email, sesi.kode)) {
+          kotakPesan.innerHTML = '<div class="pesan pesan-galat">Akun ini sudah mengerjakan sesi tersebut. ' +
+            'Lihat posisi Anda di <a href="#/peringkat">papan peringkat</a>.</div>';
+          return;
+        }
+      } catch (e) { console.warn('[lobi] gagal memeriksa peserta:', e); }
+
+      main = {
+        akun,
+        sesiKode: sesi.kode || 'sesi',
+        sesiJudul: sesi.judul || K.namaSesi,
+        detikPerSoal: sesi.detikPerSoal || 30,
+        poinCepat: sesi.poinCepat !== false,
+        batasSesi: sesi.selesai || null,
+        butir: undiButir(sesi.jumlahSoal || 20),
+        indeks: 0,
+        jawaban: {},
+        poin: 0,
+        beruntun: 0,
+        beruntunMaks: 0,
+        mulai: Date.now(),
+        mulaiSoal: Date.now()
+      };
+      hasil = null; simpanHasilSesi();
+      simpanMain();
+      ke('#/tes');
+    };
+  }
+
+  /* ── 5d. Ujian ala Kahoot ────────────────────────────────────── */
+
+  function halamanTes() {
+    if (!main) { ke(akun ? '#/lobi' : '#/akun'); return; }
+
+    halaman.innerHTML = kop('Ruang Ujian', true) + `
+      <div class="wadah">
+        <div class="bilah-main">
+          <div class="bilah-kiri">
+            <span class="lencana-soal" id="lencanaSoal">Soal 1/${main.butir.length}</span>
+            <span class="beruntun" id="beruntun" hidden></span>
+          </div>
+          <div class="bilah-kanan">
+            <button class="tombol-suara" id="btnSuara" title="Nyalakan/matikan suara"></button>
+            <span class="poin-kini" id="poinKini">0 poin</span>
+            <span class="jam-bulat" id="jamSoal">--</span>
+          </div>
+        </div>
+        <div class="rel"><span id="relWaktu" style="width:100%"></span></div>
+        <div id="panggung"></div>
+      </div>
+      <div id="kilat" class="kilat" hidden></div>`;
+
+    const tSuara = $('#btnSuara');
+    const perbaruiSuara = () => { tSuara.textContent = Suara.nyala ? '🔊' : '🔇'; };
+    perbaruiSuara();
+    tSuara.onclick = () => { Suara.nyala = !Suara.nyala; perbaruiSuara(); Suara.tik(); };
+
     gambarSoal();
-    jalankanJam();
   }
 
   function gambarSoal() {
-    const total = sesi.butir.length;
-    const i = Math.min(sesi.indeks, total - 1);
-    const butir = sesi.butir[i];
+    const total = main.butir.length;
+    const i = Math.min(main.indeks, total - 1);
+    const butir = main.butir[i];
     const s = soalDari(butir.id);
-    const dijawab = Object.keys(sesi.jawaban).length;
-    const pilihSekarang = sesi.jawaban[butir.id];
 
-    $('#rel').style.width = Math.round((dijawab / total) * 100) + '%';
+    $('#lencanaSoal').textContent = `Soal ${i + 1}/${total}`;
+    $('#poinKini').textContent = angkaRapi(main.poin) + ' poin';
+    perbaruiBeruntun();
 
-    $('#kartuSoal').innerHTML = `
-      <div class="nomor-soal">Soal ${i + 1} dari ${total} &nbsp;·&nbsp; terjawab ${dijawab}</div>
-      <p class="teks-soal">${aman(s.q)}</p>
-      <div class="opsi-daftar" id="opsiDaftar">
-        ${butir.urut.map((asli, n) => `
-          <button type="button" class="opsi${pilihSekarang === asli ? ' terpilih' : ''}" data-asli="${asli}">
-            <span class="huruf">${HURUF[n]}</span>
-            <span>${aman(s.o[asli])}</span>
-          </button>`).join('')}
+    $('#panggung').innerHTML = `
+      <div class="kartu kartu-soal" id="kartuSoal">
+        <p class="teks-soal">${aman(s.q)}</p>
       </div>
-      <div class="navigasi-soal">
-        <button class="btn btn-hantu" id="btnMundur"${i === 0 ? ' disabled' : ''}>← Sebelumnya</button>
-        ${i === total - 1
-          ? `<button class="btn btn-kuning" id="btnKirim">Kumpulkan lembar jawaban</button>`
-          : `<button class="btn btn-biru" id="btnMaju">Berikutnya →</button>`}
+      <div class="ubin-daftar" id="ubinDaftar">
+        ${butir.urut.map((asli, n) => `
+          <button type="button" class="ubin ${WARNA_UBIN[n]}" data-asli="${asli}" style="--i:${n}">
+            <span class="bentuk">${BENTUK[n]}</span>
+            <span class="ubin-teks">${aman(s.o[asli])}</span>
+          </button>`).join('')}
       </div>`;
 
-    $('#opsiDaftar').addEventListener('click', (ev) => {
-      const tombol = ev.target.closest('.opsi');
-      if (!tombol) return;
-      sesi.jawaban[butir.id] = Number(tombol.dataset.asli);
-      simpanSesi();
-      if (i < sesi.butir.length - 1) { sesi.indeks = i + 1; simpanSesi(); gambarSoal(); }
-      else gambarSoal();
-    });
-
-    const mundur = $('#btnMundur');
-    if (mundur) mundur.onclick = () => { sesi.indeks = i - 1; simpanSesi(); gambarSoal(); };
-    const maju = $('#btnMaju');
-    if (maju) maju.onclick = () => { sesi.indeks = i + 1; simpanSesi(); gambarSoal(); };
-    const kirim = $('#btnKirim');
-    if (kirim) kirim.onclick = () => mintaKumpulkan(false);
-
-    $('#petaSoal').innerHTML = sesi.butir.map((b, n) => `
-      <button type="button" data-n="${n}"
-        class="${n === i ? 'kini' : (sesi.jawaban[b.id] != null ? 'isi' : '')}"
-        title="Soal ${n + 1}">${n + 1}</button>`).join('');
-    $('#petaSoal').onclick = (ev) => {
-      const t = ev.target.closest('button');
-      if (!t) return;
-      sesi.indeks = Number(t.dataset.n);
-      simpanSesi();
-      gambarSoal();
+    $('#ubinDaftar').onclick = (ev) => {
+      const ubin = ev.target.closest('.ubin');
+      if (!ubin || $('#ubinDaftar').classList.contains('terkunci')) return;
+      jawab(Number(ubin.dataset.asli));
     };
+
+    jalankanJamSoal();
   }
 
-  function jalankanJam() {
-    const kotak = $('#jam');
-    if (!kotak) return;
-    const batasDetik = (K.batasMenit || 0) * 60;
+  function perbaruiBeruntun() {
+    const el = $('#beruntun');
+    if (!el) return;
+    if (main.beruntun >= 2) {
+      el.hidden = false;
+      el.textContent = `🔥 Beruntun ${main.beruntun}`;
+      el.classList.remove('denyut');
+      void el.offsetWidth;      // paksa animasi mengulang
+      el.classList.add('denyut');
+    } else {
+      el.hidden = true;
+    }
+  }
+
+  function jalankanJamSoal() {
+    if (jamId) { clearInterval(jamId); jamId = null; }
+    const batas = (main.detikPerSoal || 30) * 1000;
+    const jam = $('#jamSoal');
+    const rel = $('#relWaktu');
+    let terakhirTik = null;
 
     const tik = () => {
-      const lewat = (Date.now() - sesi.mulai) / 1000;
-      if (batasDetik > 0) {
-        const sisa = batasDetik - lewat;
-        kotak.textContent = mmss(sisa);
-        kotak.classList.toggle('mepet', sisa <= 120);
-        if (sisa <= 0) {
-          clearInterval(jamId); jamId = null;
-          mintaKumpulkan(true);
-        }
-      } else {
-        kotak.textContent = mmss(lewat);
+      // jendela sesi habis → kumpulkan apa adanya
+      if (main.batasSesi && Date.now() > new Date(main.batasSesi).getTime()) {
+        clearInterval(jamId); jamId = null;
+        selesaikan('waktu-sesi');
+        return;
+      }
+      const sisa = batas - (Date.now() - main.mulaiSoal);
+      const detik = Math.max(0, Math.ceil(sisa / 1000));
+      if (jam) {
+        jam.textContent = detik;
+        jam.classList.toggle('mepet', detik <= 5);
+      }
+      if (rel) rel.style.width = Math.max(0, (sisa / batas) * 100) + '%';
+      if (detik <= 5 && detik > 0 && detik !== terakhirTik) { terakhirTik = detik; Suara.tik(); }
+      if (sisa <= 0) {
+        clearInterval(jamId); jamId = null;
+        jawab(-1);
       }
     };
     tik();
-    jamId = setInterval(tik, 1000);
+    jamId = setInterval(tik, 100);
   }
 
-  function mintaKumpulkan(otomatis) {
-    const belum = sesi.butir.filter(b => sesi.jawaban[b.id] == null).length;
-    if (!otomatis && belum > 0) {
-      const lanjut = confirm(`Masih ada ${belum} soal yang belum dijawab.\n` +
-        'Soal yang kosong dihitung salah. Tetap kumpulkan sekarang?');
-      if (!lanjut) return;
-    }
-    kumpulkan(otomatis);
-  }
-
-  async function kumpulkan(otomatis) {
+  function jawab(pilih) {
     if (jamId) { clearInterval(jamId); jamId = null; }
-    const tombol = $('#btnKirim');
-    if (tombol) { tombol.disabled = true; tombol.textContent = 'Mengirim…'; }
+    const daftar = $('#ubinDaftar');
+    if (daftar) daftar.classList.add('terkunci');
 
-    const rincian = sesi.butir.map(b => {
-      const s = soalDari(b.id);
-      const pilih = sesi.jawaban[b.id];
+    const i = main.indeks;
+    const butir = main.butir[i];
+    const s = soalDari(butir.id);
+    const benar = pilih === s.a;
+    const batas = (main.detikPerSoal || 30) * 1000;
+    const sisa = Math.max(0, batas - (Date.now() - main.mulaiSoal));
+
+    let poin = 0;
+    if (benar) {
+      const cepat = main.poinCepat ? Math.round((K.poinCepatMaks || 400) * (sisa / batas)) : (K.poinCepatMaks || 400);
+      main.beruntun += 1;
+      main.beruntunMaks = Math.max(main.beruntunMaks, main.beruntun);
+      const bonus = main.beruntun >= 3
+        ? (K.bonusBeruntun || 50) * Math.min(main.beruntun - 2, 5)
+        : 0;
+      poin = (K.poinDasar || 600) + cepat + bonus;
+    } else {
+      main.beruntun = 0;
+    }
+
+    main.poin += poin;
+    main.jawaban[butir.id] = { pilih, benar, poin, detik: Math.round((batas - sisa) / 1000) };
+    simpanMain();
+
+    // ── tampilan umpan balik ──
+    if (daftar) {
+      for (const ubin of daftar.querySelectorAll('.ubin')) {
+        const asli = Number(ubin.dataset.asli);
+        if (asli === s.a) ubin.classList.add('kunci');
+        else ubin.classList.add('redup');
+        if (asli === pilih && !benar) ubin.classList.add('keliru');
+      }
+    }
+    $('#poinKini').textContent = angkaRapi(main.poin) + ' poin';
+    perbaruiBeruntun();
+    benar ? Suara.benar() : Suara.salah();
+    kilat(benar, poin, pilih === -1);
+    if (benar) taburKonfeti();
+
+    setTimeout(() => {
+      if (main.indeks >= main.butir.length - 1) { selesaikan('tuntas'); return; }
+      main.indeks += 1;
+      main.mulaiSoal = Date.now();
+      simpanMain();
+      gambarSoal();
+    }, 1900);
+  }
+
+  function kilat(benar, poin, habisWaktu) {
+    const el = $('#kilat');
+    if (!el) return;
+    el.className = 'kilat ' + (benar ? 'kilat-benar' : 'kilat-salah');
+    el.hidden = false;
+    el.innerHTML = `
+      <div class="kilat-isi">
+        <div class="kilat-ikon">${benar ? '✔' : (habisWaktu ? '⏱' : '✕')}</div>
+        <div class="kilat-teks">${benar ? 'Tepat!' : (habisWaktu ? 'Waktu habis' : 'Belum tepat')}</div>
+        ${benar ? `<div class="kilat-poin">+${angkaRapi(poin)} poin</div>` : ''}
+      </div>`;
+    setTimeout(() => { el.hidden = true; el.innerHTML = ''; }, 1500);
+  }
+
+  function taburKonfeti() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const wadah = document.createElement('div');
+    wadah.className = 'konfeti';
+    const warna = ['#ffc72c', '#3fa9ff', '#29d17c', '#ff5d6c', '#ffffff'];
+    for (let n = 0; n < 26; n++) {
+      const k = document.createElement('i');
+      k.style.left = Math.random() * 100 + '%';
+      k.style.background = warna[n % warna.length];
+      k.style.animationDelay = (Math.random() * 0.25) + 's';
+      k.style.transform = `rotate(${Math.random() * 360}deg)`;
+      wadah.appendChild(k);
+    }
+    document.body.appendChild(wadah);
+    setTimeout(() => wadah.remove(), 1800);
+  }
+
+  async function selesaikan(sebab) {
+    if (jamId) { clearInterval(jamId); jamId = null; }
+
+    const rincian = main.butir.map(b => {
+      const j = main.jawaban[b.id];
       return {
         id: b.id,
-        pilih: pilih == null ? -1 : pilih,
-        benar: pilih === s.a
+        pilih: j ? j.pilih : -1,
+        benar: j ? !!j.benar : false,
+        poin: j ? j.poin : 0,
+        detik: j ? j.detik : null
       };
     });
     const benar = rincian.filter(r => r.benar).length;
     const total = rincian.length;
-    const skor = Math.round((benar / total) * 100);
-    const durasiDetik = Math.round((Date.now() - sesi.mulai) / 1000);
-    const p = sesi.peserta;
+    const a = main.akun;
 
     const rekaman = {
-      nama: p.nama,
-      email: p.email,
-      emailKunci: p.email.trim().toLowerCase(),
-      instansi: p.instansi,
-      token: p.token.toUpperCase(),
-      sesiNama: K.namaSesi || 'Pre-Test',
+      nama: a.nama,
+      email: a.email,
+      emailKunci: String(a.email).trim().toLowerCase(),
+      instansi: a.instansi,
+      jabatan: a.jabatan || '',
+      sesiKode: main.sesiKode,
+      sesiJudul: main.sesiJudul,
       tahun: K.tahun || new Date().getFullYear(),
-      skor, benar, total, durasiDetik,
-      otomatis: !!otomatis,
+      skor: Math.round((benar / total) * 100),
+      poin: main.poin,
+      benar, total,
+      beruntunMaks: main.beruntunMaks,
+      durasiDetik: Math.round((Date.now() - main.mulai) / 1000),
+      sebabSelesai: sebab,
       waktuSelesai: new Date().toISOString(),
       jawaban: rincian
     };
 
     let tersimpan = true;
-    try {
-      await window.DB.simpan(rekaman);
-    } catch (e) {
-      console.error('[kumpulkan] gagal menyimpan:', e);
-      tersimpan = false;
-    }
+    try { await window.DB.simpan(rekaman); }
+    catch (e) { console.error('[selesai] gagal menyimpan:', e); tersimpan = false; }
 
-    hasil = { ...rekaman, tersimpan, otomatis: !!otomatis };
+    hasil = { ...rekaman, tersimpan };
     simpanHasilSesi();
-    sesi = null;
-    simpanSesi();
+    main = null; simpanMain();
     ke('#/hasil');
   }
 
-  /* ── 5d. Halaman: Hasil ──────────────────────────────────────── */
+  /* ── 5e. Hasil ───────────────────────────────────────────────── */
 
   function halamanHasil() {
-    if (!hasil) { ke('#/masuk'); return; }
+    if (!hasil) { ke(akun ? '#/lobi' : '#/akun'); return; }
     const h = hasil;
     const salah = h.total - h.benar;
 
     halaman.innerHTML = kop('Hasil Pre-Test') + `
       <div class="wadah">
         <div class="label-sudut">Lembar Jawaban Terkirim</div>
-        <h1 class="judul-halaman">Terima kasih, <em>${aman(h.nama.split(' ')[0])}</em></h1>
-        <p class="ket-halaman">${aman(h.instansi)} · ${aman(tanggalIndo(h.waktuSelesai))}</p>
+        <h1 class="judul-halaman">Kerja bagus, <em>${aman(h.nama.split(' ')[0])}</em></h1>
+        <p class="ket-halaman">${aman(h.instansi)} · ${aman(h.sesiJudul || '')} · ${aman(tanggalIndo(h.waktuSelesai))}</p>
 
-        ${h.otomatis ? '<div class="pesan pesan-info" style="margin-bottom:18px">Waktu habis — lembar jawaban dikumpulkan otomatis.</div>' : ''}
+        ${h.sebabSelesai === 'waktu-sesi' ? '<div class="pesan pesan-info" style="margin-bottom:18px">Jendela waktu sesi berakhir — lembar jawaban dikumpulkan otomatis.</div>' : ''}
         ${h.tersimpan ? '' : '<div class="pesan pesan-galat" style="margin-bottom:18px">Nilai Anda gagal dikirim ke server (jaringan bermasalah). Tunjukkan layar ini ke panitia sebelum menutup halaman.</div>'}
 
         <div class="kartu" style="text-align:center">
-          <div class="skor-besar">${h.skor}</div>
-          <div class="skor-ket">nilai akhir dari 100</div>
+          <div class="poin-besar">${angkaRapi(h.poin)}</div>
+          <div class="skor-ket">poin terkumpul</div>
           <div class="grid-statistik">
+            <div class="statistik"><div class="angka">${h.skor}</div><div class="nama">Nilai (0–100)</div></div>
             <div class="statistik"><div class="angka">${h.benar}</div><div class="nama">Jawaban benar</div></div>
             <div class="statistik"><div class="angka">${salah}</div><div class="nama">Jawaban salah</div></div>
-            <div class="statistik"><div class="angka">${h.total}</div><div class="nama">Total soal</div></div>
+            <div class="statistik"><div class="angka">${h.beruntunMaks || 0}</div><div class="nama">Beruntun terpanjang</div></div>
             <div class="statistik"><div class="angka">${mmss(h.durasiDetik)}</div><div class="nama">Waktu kerja</div></div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
@@ -537,12 +841,14 @@
           ${h.jawaban.map((r, n) => {
             const s = soalDari(r.id);
             if (!s) return '';
-            const jawabTeks = r.pilih >= 0 ? s.o[r.pilih] : 'Tidak dijawab';
+            const jawabTeks = r.pilih >= 0 ? s.o[r.pilih] : 'Tidak dijawab / waktu habis';
             return `
               <div class="butir${r.benar ? ' tepat' : ''}">
                 <div class="tanya">${n + 1}. ${aman(s.q)}</div>
                 <div class="baris kunci">Kunci: <b>${aman(s.o[s.a])}</b></div>
-                ${r.benar ? '' : `<div class="baris jawab-salah">Jawaban Anda: <b>${aman(jawabTeks)}</b></div>`}
+                ${r.benar
+                  ? `<div class="baris">Poin: <b>+${angkaRapi(r.poin)}</b>${r.detik != null ? ` · dijawab dalam ${r.detik} detik` : ''}</div>`
+                  : `<div class="baris jawab-salah">Jawaban Anda: <b>${aman(jawabTeks)}</b></div>`}
                 <div class="catatan">${aman(s.bahas || '')}</div>
               </div>`;
           }).join('')}
@@ -550,12 +856,13 @@
       </div>`;
   }
 
-  /* ── 5e. Papan peringkat ─────────────────────────────────────── */
+  /* ── 5f. Papan peringkat ─────────────────────────────────────── */
 
   function urutkan(daftar) {
     return daftar.slice().sort((a, b) =>
-      (b.skor - a.skor) ||
-      (a.durasiDetik - b.durasiDetik) ||
+      ((b.poin || 0) - (a.poin || 0)) ||
+      ((b.skor || 0) - (a.skor || 0)) ||
+      ((a.durasiDetik || 0) - (b.durasiDetik || 0)) ||
       String(a.waktuSelesai).localeCompare(String(b.waktuSelesai)));
   }
 
@@ -585,12 +892,12 @@
       </svg>`;
   }
 
-  async function halamanPeringkat() {
+  function halamanPeringkat() {
     halaman.innerHTML = kop('Papan Peringkat') + `
       <div class="wadah">
         <div class="label-sudut">Papan Peringkat</div>
         <h1 class="judul-halaman">Juara <em>pre-test</em> ${aman(String(K.tahun || ''))}</h1>
-        <p class="ket-halaman">Urutan disusun dari nilai tertinggi; bila nilai sama, waktu pengerjaan tercepat yang unggul.</p>
+        <p class="ket-halaman">Urutan disusun dari poin tertinggi — jawaban benar yang cepat dan beruntun naik lebih tinggi.</p>
         <div id="isiPeringkat" class="kosong">Memuat data…</div>
       </div>`;
 
@@ -600,44 +907,42 @@
       return;
     }
 
-    let daftar = [];
-    try { daftar = urutkan(await window.DB.ambilSemua()); }
-    catch (e) {
-      $('#isiPeringkat').outerHTML =
-        '<div class="pesan pesan-galat">Data peringkat gagal dimuat. Periksa sambungan internet lalu muat ulang halaman.</div>';
-      return;
-    }
+    // Papan ikut hidup: peserta yang baru selesai langsung muncul.
+    lepasPantau = window.DB.pantauHasil((daftar) => {
+      const kotak = $('#isiPeringkat');
+      if (!kotak) return;
+      kotak.innerHTML = isiPapan(urutkan(daftar));
+    });
+  }
 
+  function isiPapan(daftar) {
     if (!daftar.length) {
-      $('#isiPeringkat').outerHTML =
-        '<div class="kartu"><div class="kosong">Belum ada peserta yang mengumpulkan lembar jawaban.</div></div>';
-      return;
+      return '<div class="kartu"><div class="kosong">Belum ada peserta yang menyelesaikan ujian.</div></div>';
     }
-
     const medali = K.medali || ['emas', 'perak', 'perunggu'];
     const tigaBesar = daftar.slice(0, 3);
 
     // Urutan DOM tetap juara 1-2-3 supaya di ponsel terbaca berurutan; di layar
     // lebar CSS yang menggeser juara 1 ke tengah (lihat .podium .juara1).
     const mimbar = tigaBesar.map((p, i) => {
-      if (!p) return '';
       const jenis = medali[i] || 'perak';
       return `
         <div class="mimbar juara${i + 1} ${jenis}">
           ${svgTropi(jenis)}
           <div class="nama-juara">${aman(p.nama)}</div>
           <div class="instansi-juara">${aman(p.instansi)}</div>
-          <div class="nilai-juara">${p.skor}</div>
+          <div class="nilai-juara">${angkaRapi(p.poin || 0)}</div>
           <div class="sebutan">Juara ${i + 1} · tropi ${jenis}</div>
         </div>`;
     }).join('');
 
-    $('#isiPeringkat').outerHTML = `
+    return `
       <div class="podium">${mimbar}</div>
       <div class="tabel-bungkus">
         <table class="tabel">
           <thead>
-            <tr><th>#</th><th>Nama</th><th>Instansi</th><th class="angka">Nilai</th><th class="angka">Benar</th><th class="angka">Waktu</th><th>Dikumpulkan</th></tr>
+            <tr><th>#</th><th>Nama</th><th>Instansi</th><th class="angka">Poin</th>
+                <th class="angka">Nilai</th><th class="angka">Benar</th><th class="angka">Beruntun</th><th>Selesai</th></tr>
           </thead>
           <tbody>
             ${daftar.map((p, n) => `
@@ -645,18 +950,19 @@
                 <td class="peringkat-nomor">${n + 1}</td>
                 <td class="bebas">${aman(p.nama)}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
+                <td class="angka" style="color:var(--kuning);font-weight:700">${angkaRapi(p.poin || 0)}</td>
                 <td class="angka">${p.skor}</td>
                 <td class="angka">${p.benar}/${p.total}</td>
-                <td class="angka">${mmss(p.durasiDetik)}</td>
+                <td class="angka">${p.beruntunMaks || 0}</td>
                 <td>${aman(tanggalIndo(p.waktuSelesai))}</td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>
-      <p class="ket-halaman" style="margin-top:14px">${daftar.length} peserta telah mengerjakan.</p>`;
+      <p class="ket-halaman" style="margin-top:14px">${daftar.length} peserta telah menyelesaikan ujian.</p>`;
   }
 
-  /* ── 5f. Halaman: Admin ──────────────────────────────────────── */
+  /* ── 5g. Ruang admin ─────────────────────────────────────────── */
 
   function halamanAdmin() {
     if (sessionStorage.getItem('pretest_admin') === 'ya') { papanAdmin(); return; }
@@ -665,12 +971,12 @@
       <div class="wadah wadah-sempit">
         <div class="label-sudut">Khusus Penyelenggara</div>
         <h1 class="judul-halaman">Masuk <em>ruang admin</em></h1>
-        <p class="ket-halaman">Masukkan token admin untuk melihat jumlah peserta, rekap nilai, dan analisis butir soal.</p>
+        <p class="ket-halaman">Token admin membuka kendali sesi, pemantauan langsung, dan rekap nilai.</p>
         <div class="kartu">
           <form class="formulir" id="formAdmin" novalidate>
             <div class="kolom">
               <label for="fTokenAdmin">Token admin</label>
-              <input id="fTokenAdmin" type="password" autocomplete="off" placeholder="••••••••••" required />
+              <input id="fTokenAdmin" type="password" autocomplete="off" placeholder="••••-••••-••••-••••" required />
             </div>
             <button class="btn btn-biru btn-blok" type="submit">Buka papan admin</button>
           </form>
@@ -680,10 +986,10 @@
 
     $('#formAdmin').addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const isi = $('#fTokenAdmin').value.trim();
-      const cap = await sha256(isi);
-      if (cap === (K.hashAdmin || '').toLowerCase()) {
+      const cap = await sha256($('#fTokenAdmin').value.trim());
+      if (cap === String(K.hashAdmin || '').toLowerCase()) {
         sessionStorage.setItem('pretest_admin', 'ya');
+        sessionStorage.setItem('pretest_admin_kunci', cap);
         papanAdmin();
       } else {
         $('#pesanAdmin').innerHTML = '<div class="pesan pesan-galat">Token admin salah.</div>';
@@ -691,51 +997,188 @@
     });
   }
 
-  async function papanAdmin() {
+  function papanAdmin() {
     halaman.innerHTML = kop('Ruang Admin') + `
       <div class="wadah">
         <div class="bilah-ujian">
           <div>
             <div class="label-sudut" style="margin-bottom:4px">Ruang Admin</div>
-            <h1 class="judul-halaman" style="margin:0">Rekap <em>${aman(K.namaSesi || 'Pre-Test')}</em></h1>
+            <h1 class="judul-halaman" style="margin:0">Kendali <em>sesi ujian</em></h1>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-hantu" id="btnMuatUlang">Muat ulang</button>
             <button class="btn btn-kuning" id="btnUnduh">Unduh CSV</button>
             <button class="btn btn-hantu" id="btnKeluarAdmin">Keluar</button>
           </div>
         </div>
+
+        <div class="kartu" id="kartuSesi"><div class="kosong">Memuat pengaturan sesi…</div></div>
+        <div id="pesanSesi"></div>
+
+        <h2 class="judul-halaman" style="font-size:20px;margin:32px 0 6px">Pemantauan langsung</h2>
+        <p class="ket-halaman">Angka di bawah ikut berubah sendiri saat peserta mengumpulkan jawaban.</p>
         <div id="isiAdmin" class="kosong">Memuat data…</div>
       </div>`;
 
-    $('#btnKeluarAdmin').onclick = () => { sessionStorage.removeItem('pretest_admin'); ke('#/'); };
-    $('#btnMuatUlang').onclick = () => papanAdmin();
+    $('#btnKeluarAdmin').onclick = () => {
+      sessionStorage.removeItem('pretest_admin');
+      sessionStorage.removeItem('pretest_admin_kunci');
+      ke('#/');
+    };
 
-    let daftar = [];
-    try { daftar = urutkan(await window.DB.ambilSemua()); }
-    catch (e) {
-      $('#isiAdmin').outerHTML = '<div class="pesan pesan-galat">Data gagal dimuat: ' + aman(e.message) + '</div>';
-      return;
-    }
+    // ── kendali sesi ──
+    sesiTergambar = null;
+    lepasPantau = window.DB.pantauSesi((dok) => {
+      sesi = dok || { ...(K.sesiBawaan || {}) };
+      gambarKendaliSesi();
+    });
 
-    $('#btnUnduh').onclick = () => unduhCsv(daftar);
+    // ── pemantauan hasil ──
+    let daftarKini = [];
+    const lepasHasil = window.DB.pantauHasil((daftar) => {
+      daftarKini = urutkan(daftar);
+      gambarPantauan(daftarKini);
+    });
+    const lepasSesi = lepasPantau;
+    lepasPantau = () => { lepasSesi(); lepasHasil(); };
 
-    if (!daftar.length) {
-      $('#isiAdmin').outerHTML = '<div class="kartu"><div class="kosong">Belum ada peserta yang mengumpulkan lembar jawaban.</div></div>';
-      return;
-    }
+    $('#btnUnduh').onclick = () => unduhCsv(daftarKini);
+  }
 
-    const jumlah = daftar.length;
-    const instansi = new Set(daftar.map(p => (p.instansi || '').trim().toLowerCase())).size;
-    const rata = Math.round(daftar.reduce((t, p) => t + (p.skor || 0), 0) / jumlah);
-    const tertinggi = Math.max(...daftar.map(p => p.skor || 0));
-    const terendah = Math.min(...daftar.map(p => p.skor || 0));
-    const rataDurasi = Math.round(daftar.reduce((t, p) => t + (p.durasiDetik || 0), 0) / jumlah);
+  // Sidik isi sesi yang sedang tergambar. Pemantauan sesi berdenyut tiap
+  // beberapa detik; tanpa penjaga ini formulir akan dibangun ulang terus dan
+  // menghapus ketikan admin.
+  let sesiTergambar = null;
 
-    // analisis butir: berapa persen peserta menjawab benar tiap soal
+  function gambarKendaliSesi() {
+    const kotak = $('#kartuSesi');
+    if (!kotak) return;
+    const cap = JSON.stringify(sesi || null);
+    if (cap === sesiTergambar) return;
+    sesiTergambar = cap;
+    const s = sesi || {};
+    const st = statusSesi(s);
+    const lampu = { buka: 'lampu-buka', menunggu: 'lampu-tunggu' }[st.keadaan] || 'lampu-tutup';
+    const ket = {
+      buka: 'Sesi TERBUKA — peserta bisa masuk dengan token',
+      menunggu: 'Terjadwal — menunggu waktu mulai',
+      lewat: 'Waktu sesi sudah lewat',
+      tutup: 'Sesi tertutup',
+      kosong: 'Belum ada sesi'
+    }[st.keadaan];
+
+    kotak.innerHTML = `
+      <div class="lampu ${lampu}"><span></span> ${aman(ket)}</div>
+      <form class="formulir kisi-dua" id="formSesi" style="margin-top:18px">
+        <div class="kolom">
+          <label for="sKode">Kode sesi</label>
+          <input id="sKode" type="text" value="${aman(s.kode || '')}" placeholder="BIMTEK-01" />
+          <span class="petunjuk">Pembeda rekap antar angkatan. Ubah kode = mulai daftar peserta baru.</span>
+        </div>
+        <div class="kolom">
+          <label for="sToken">Token peserta</label>
+          <input id="sToken" class="masukan-token" type="text" value="${aman(s.token || '')}" placeholder="BIMTEK2026" />
+        </div>
+        <div class="kolom kolom-lebar">
+          <label for="sJudul">Judul sesi</label>
+          <input id="sJudul" type="text" value="${aman(s.judul || '')}" placeholder="Pre-Test BIMTEK eMonDAK Angkatan 1" />
+        </div>
+        <div class="kolom">
+          <label for="sMulai">Dibuka mulai</label>
+          <input id="sMulai" type="datetime-local" value="${keInputWaktu(s.mulai)}" />
+        </div>
+        <div class="kolom">
+          <label for="sSelesai">Ditutup pukul</label>
+          <input id="sSelesai" type="datetime-local" value="${keInputWaktu(s.selesai)}" />
+        </div>
+        <div class="kolom">
+          <label for="sJumlah">Jumlah soal (maks. 21)</label>
+          <input id="sJumlah" type="number" min="5" max="21" value="${Number(s.jumlahSoal || 20)}" />
+        </div>
+        <div class="kolom">
+          <label for="sDetik">Detik per soal</label>
+          <input id="sDetik" type="number" min="10" max="120" value="${Number(s.detikPerSoal || 30)}" />
+        </div>
+        <div class="kolom kolom-lebar">
+          <label class="centang">
+            <input id="sPoinCepat" type="checkbox" ${s.poinCepat !== false ? 'checked' : ''} />
+            <span>Poin kecepatan — makin cepat menjawab, makin besar poinnya</span>
+          </label>
+        </div>
+        <div class="kolom-lebar baris-tombol">
+          <button class="btn btn-biru" type="submit">Simpan pengaturan</button>
+          ${st.keadaan === 'buka'
+            ? '<button class="btn btn-hantu" id="btnTutup" type="button">Tutup sesi sekarang</button>'
+            : '<button class="btn btn-kuning" id="btnBuka" type="button">Buka sesi sekarang</button>'}
+        </div>
+      </form>`;
+
+    const bacaForm = () => ({
+      kode: $('#sKode').value.trim() || 'sesi',
+      token: $('#sToken').value.trim(),
+      judul: $('#sJudul').value.trim(),
+      mulai: $('#sMulai').value ? new Date($('#sMulai').value).toISOString() : null,
+      selesai: $('#sSelesai').value ? new Date($('#sSelesai').value).toISOString() : null,
+      jumlahSoal: Math.min(21, Math.max(5, Number($('#sJumlah').value) || 20)),
+      detikPerSoal: Math.min(120, Math.max(10, Number($('#sDetik').value) || 30)),
+      poinCepat: $('#sPoinCepat').checked,
+      aktif: !!(sesi && sesi.aktif)
+    });
+
+    const simpan = async (ubah) => {
+      const kunci = sessionStorage.getItem('pretest_admin_kunci');
+      const isi = { ...bacaForm(), ...(ubah || {}) };
+      if (!isi.token) {
+        $('#pesanSesi').innerHTML = '<div class="pesan pesan-galat">Token peserta belum diisi.</div>';
+        return;
+      }
+      try {
+        await window.DB.simpanSesi(isi, kunci);
+        $('#pesanSesi').innerHTML = '<div class="pesan pesan-info">Pengaturan sesi tersimpan.</div>';
+      } catch (e) {
+        console.error('[admin] gagal menyimpan sesi:', e);
+        $('#pesanSesi').innerHTML = '<div class="pesan pesan-galat">Gagal menyimpan: ' + aman(e.message) +
+          '<br>Pastikan dokumen <b>pretestRahasia/admin</b> di Firestore sudah berisi sidik jari token admin (lihat firestore.rules).</div>';
+      }
+    };
+
+    $('#formSesi').onsubmit = (ev) => { ev.preventDefault(); simpan(); };
+    const buka = $('#btnBuka');
+    if (buka) buka.onclick = () => {
+      const kini = new Date();
+      const isi = bacaForm();
+      // Membuka "sekarang": bila jadwal belum diisi, sesi dibuka seketika
+      // selama 60 menit ke depan.
+      simpan({
+        aktif: true,
+        mulai: isi.mulai && new Date(isi.mulai) > kini ? isi.mulai : kini.toISOString(),
+        selesai: isi.selesai && new Date(isi.selesai) > kini
+          ? isi.selesai
+          : new Date(kini.getTime() + 60 * 60000).toISOString()
+      });
+    };
+    const tutup = $('#btnTutup');
+    if (tutup) tutup.onclick = () => simpan({ aktif: false, selesai: new Date().toISOString() });
+  }
+
+  async function gambarPantauan(daftar) {
+    const kotak = $('#isiAdmin');
+    if (!kotak) return;
+
+    const kode = (sesi && sesi.kode) || null;
+    const sesiIni = kode ? daftar.filter(p => p.sesiKode === kode) : daftar;
+    let jumlahAkun = '—';
+    try { jumlahAkun = await window.DB.jumlahAkun(); } catch { /* biarkan */ }
+
+    const n = sesiIni.length;
+    const instansi = new Set(sesiIni.map(p => (p.instansi || '').trim().toLowerCase())).size;
+    const rata = n ? Math.round(sesiIni.reduce((t, p) => t + (p.skor || 0), 0) / n) : 0;
+    const rataPoin = n ? Math.round(sesiIni.reduce((t, p) => t + (p.poin || 0), 0) / n) : 0;
+    const tertinggi = n ? Math.max(...sesiIni.map(p => p.skor || 0)) : 0;
+    const terendah = n ? Math.min(...sesiIni.map(p => p.skor || 0)) : 0;
+
     const butir = BANK.map(s => {
       let muncul = 0, tepat = 0;
-      for (const p of daftar) {
+      for (const p of sesiIni) {
         const r = (p.jawaban || []).find(x => x.id === s.id);
         if (!r) continue;
         muncul++;
@@ -744,16 +1187,18 @@
       return { id: s.id, q: s.q, muncul, tepat, persen: muncul ? Math.round((tepat / muncul) * 100) : null };
     }).filter(b => b.muncul > 0).sort((a, b) => a.persen - b.persen);
 
-    $('#isiAdmin').outerHTML = `
+    kotak.innerHTML = `
       <div class="grid-statistik">
-        <div class="statistik"><div class="angka">${jumlah}</div><div class="nama">Peserta mengisi</div></div>
+        <div class="statistik sorot"><div class="angka">${n}</div><div class="nama">Sudah mengisi${kode ? ' (sesi ' + aman(kode) + ')' : ''}</div></div>
+        <div class="statistik"><div class="angka">${jumlahAkun}</div><div class="nama">Akun terdaftar</div></div>
         <div class="statistik"><div class="angka">${instansi}</div><div class="nama">Instansi</div></div>
+        <div class="statistik"><div class="angka">${angkaRapi(rataPoin)}</div><div class="nama">Rata-rata poin</div></div>
         <div class="statistik"><div class="angka">${rata}</div><div class="nama">Rata-rata nilai</div></div>
         <div class="statistik"><div class="angka">${tertinggi}</div><div class="nama">Nilai tertinggi</div></div>
         <div class="statistik"><div class="angka">${terendah}</div><div class="nama">Nilai terendah</div></div>
-        <div class="statistik"><div class="angka">${mmss(rataDurasi)}</div><div class="nama">Rata-rata waktu</div></div>
       </div>
 
+      ${n === 0 ? '<div class="kartu" style="margin-top:18px"><div class="kosong">Belum ada peserta yang menyelesaikan ujian pada sesi ini.</div></div>' : `
       <div class="kolom" style="max-width:340px;margin:22px 0 12px">
         <label for="cari">Cari nama / instansi / email</label>
         <input id="cari" type="search" placeholder="ketik untuk menyaring…" />
@@ -762,17 +1207,18 @@
       <div class="tabel-bungkus">
         <table class="tabel" id="tabelAdmin">
           <thead>
-            <tr><th>#</th><th>Nama</th><th>Email</th><th>Instansi</th><th>Token</th>
-                <th class="angka">Nilai</th><th class="angka">Benar</th><th class="angka">Waktu</th><th>Dikumpulkan</th></tr>
+            <tr><th>#</th><th>Nama</th><th>Email</th><th>Instansi</th>
+                <th class="angka">Poin</th><th class="angka">Nilai</th><th class="angka">Benar</th>
+                <th class="angka">Waktu</th><th>Selesai</th></tr>
           </thead>
           <tbody>
-            ${daftar.map((p, n) => `
+            ${sesiIni.map((p, i) => `
               <tr data-cari="${aman(((p.nama || '') + ' ' + (p.instansi || '') + ' ' + (p.email || '')).toLowerCase())}">
-                <td class="peringkat-nomor">${n + 1}</td>
+                <td class="peringkat-nomor">${i + 1}</td>
                 <td class="bebas">${aman(p.nama)}</td>
                 <td>${aman(p.email)}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
-                <td>${aman(p.token)}</td>
+                <td class="angka" style="color:var(--kuning);font-weight:700">${angkaRapi(p.poin || 0)}</td>
                 <td class="angka">${p.skor}</td>
                 <td class="angka">${p.benar}/${p.total}</td>
                 <td class="angka">${mmss(p.durasiDetik)}</td>
@@ -798,7 +1244,7 @@
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>
+      </div>`}
 
       ${window.DB.mode === 'lokal'
         ? `<div class="pesan pesan-info" style="margin-top:22px">
@@ -808,32 +1254,30 @@
         : ''}`;
 
     const cari = $('#cari');
-    if (cari) {
-      cari.oninput = () => {
-        const kata = cari.value.trim().toLowerCase();
-        for (const tr of document.querySelectorAll('#tabelAdmin tbody tr')) {
-          tr.style.display = !kata || tr.dataset.cari.includes(kata) ? '' : 'none';
-        }
-      };
-    }
+    if (cari) cari.oninput = () => {
+      const kata = cari.value.trim().toLowerCase();
+      for (const tr of document.querySelectorAll('#tabelAdmin tbody tr')) {
+        tr.style.display = !kata || tr.dataset.cari.includes(kata) ? '' : 'none';
+      }
+    };
     const bersih = $('#btnBersih');
     if (bersih) bersih.onclick = () => {
       if (confirm('Hapus seluruh data pre-test yang tersimpan di peramban ini?')) {
         window.DB.kosongkanLokal();
-        papanAdmin();
+        ke('#/admin');
       }
     };
   }
 
   function unduhCsv(daftar) {
     const baris = [[
-      'Peringkat', 'Nama', 'Email', 'Instansi', 'Token',
-      'Nilai', 'Benar', 'Total', 'Durasi (detik)', 'Durasi', 'Waktu Selesai'
+      'Peringkat', 'Nama', 'Email', 'Instansi', 'Jabatan', 'Sesi',
+      'Poin', 'Nilai', 'Benar', 'Total', 'Beruntun', 'Durasi (detik)', 'Durasi', 'Waktu Selesai'
     ]];
     daftar.forEach((p, n) => baris.push([
-      n + 1, p.nama, p.email, p.instansi, p.token,
-      p.skor, p.benar, p.total, p.durasiDetik, mmss(p.durasiDetik),
-      tanggalIndo(p.waktuSelesai)
+      n + 1, p.nama, p.email, p.instansi, p.jabatan || '', p.sesiKode || '',
+      p.poin || 0, p.skor, p.benar, p.total, p.beruntunMaks || 0,
+      p.durasiDetik, mmss(p.durasiDetik), tanggalIndo(p.waktuSelesai)
     ]));
 
     const csv = baris.map(r => r.map(sel => {
@@ -845,16 +1289,15 @@
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const stempel = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `rekap-pretest-bimtek-${stempel}.csv`;
+    a.download = `rekap-pretest-bimtek-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  /* ── 5g. Halaman: Bantuan ────────────────────────────────────── */
+  /* ── 5h. Bantuan ─────────────────────────────────────────────── */
 
   function halamanBantuan() {
     const wa = String(K.waPanitia || '').replace(/\D/g, '');
@@ -863,34 +1306,33 @@
         <div class="label-sudut">Bantuan</div>
         <h1 class="judul-halaman">Ada kendala saat <em>mengerjakan</em>?</h1>
         <div class="kartu">
-          <div class="langkah-tanya">
-            <p class="ket-halaman"><b style="color:#fff">Token ditolak.</b><br>
-              Pastikan tidak ada spasi di awal atau akhir. Token tidak membedakan huruf besar dan kecil.
-              Bila masih ditolak, mintakan token yang berlaku ke panitia kelas.</p>
-            <p class="ket-halaman"><b style="color:#fff">Email saya disebut sudah mengerjakan.</b><br>
-              Satu email hanya bisa satu kali. Bila Anda merasa belum pernah mengisi, laporkan ke panitia
-              agar datanya diperiksa.</p>
-            <p class="ket-halaman"><b style="color:#fff">Halaman tertutup di tengah ujian.</b><br>
-              Buka kembali alamat yang sama di peramban dan perangkat yang sama — jawaban serta sisa
-              waktu Anda dipulihkan otomatis.</p>
-            <p class="ket-halaman"><b style="color:#fff">Nilai gagal terkirim.</b><br>
-              Layar hasil akan memberi tahu bila pengiriman gagal. Jangan tutup halaman; tunjukkan
-              layar tersebut ke panitia.</p>
-          </div>
+          <p class="ket-halaman"><b style="color:#fff">Token ditolak.</b><br>
+            Token hanya berlaku pada sesi yang sedang dibuka panitia. Pastikan tidak ada spasi
+            di awal atau akhir; huruf besar/kecil tidak berpengaruh.</p>
+          <p class="ket-halaman"><b style="color:#fff">Layar lobi belum berubah.</b><br>
+            Biarkan halaman terbuka. Begitu panitia menekan tombol buka, layar berganti sendiri
+            tanpa perlu dimuat ulang.</p>
+          <p class="ket-halaman"><b style="color:#fff">Akun ini disebut sudah mengerjakan.</b><br>
+            Satu akun hanya bisa satu kali per sesi. Bila Anda merasa belum pernah mengisi,
+            laporkan ke panitia agar datanya diperiksa.</p>
+          <p class="ket-halaman"><b style="color:#fff">Halaman tertutup di tengah ujian.</b><br>
+            Buka kembali alamat yang sama di peramban dan perangkat yang sama — soal yang sudah
+            dijawab beserta poinnya dipulihkan. Hitung mundur tetap berjalan selama itu.</p>
+          <p class="ket-halaman"><b style="color:#fff">Nilai gagal terkirim.</b><br>
+            Layar hasil akan memberi tahu bila pengiriman gagal. Jangan tutup halaman; tunjukkan
+            layar tersebut ke panitia.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
             ${wa ? `<a class="btn btn-kuning" href="https://wa.me/${wa}" target="_blank" rel="noopener">Hubungi panitia via WhatsApp</a>` : ''}
             ${K.emailPanitia ? `<a class="btn btn-hantu" href="mailto:${aman(K.emailPanitia)}">Kirim email</a>` : ''}
           </div>
         </div>
-        <p class="ket-halaman" style="margin-top:20px">
-          ${aman(K.penyelenggara || '')}
-        </p>
+        <p class="ket-halaman" style="margin-top:20px">${aman(K.penyelenggara || '')}</p>
       </div>`;
   }
 
   /* ── Jalankan ────────────────────────────────────────────────── */
 
-  muatSesi();
+  muatKeadaan();
   window.addEventListener('hashchange', render);
 
   window.DB.init().then(mode => {

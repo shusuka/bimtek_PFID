@@ -1,36 +1,98 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ATURAN FIRESTORE — koleksi `pretestHasil`
+// ATURAN FIRESTORE — pre-test BIMTEK eMonDAK
 //
-// DUA CARA MEMASANG
+// Koleksi yang dipakai
+//   pretestAkun/{idAkun}    profil peserta (nama, email, instansi)
+//   pretestSesi/aktif       jadwal & token sesi yang sedang berjalan
+//   pretestHasil/{auto}     nilai akhir tiap peserta
+//   pretestRahasia/admin    sidik jari SHA-256 token admin — TIDAK dapat
+//                           dibaca siapa pun; hanya dipakai aturan di bawah
 //
-//  A. Bila memakai proyek Firebase BARU khusus pre-test:
-//     Console → Firestore Database → Rules → hapus isinya → tempel SELURUH
-//     berkas ini → Publish.
+// ───────────────────────────────────────────────────────────────────────────
+// LANGKAH PEMASANGAN (WAJIB, dua bagian)
 //
-//  B. Bila menumpang proyek emondak-faee8 (bawaan assets/firebase-config.js):
-//     JANGAN menimpa aturan yang sudah ada di sana — aplikasi monev-dak
-//     memakainya. Salin HANYA blok `match /pretestHasil/{id} { … }` di bawah,
-//     lalu tempel di dalam `match /databases/{database}/documents { … }`
-//     TEPAT SEBELUM blok penutup `match /{document=**}`. Publish.
-//     Alamat: https://console.firebase.google.com/u/0/project/emondak-faee8/firestore/rules
+//  1) DOKUMEN RAHASIA — sekali saja, lewat Firebase Console
+//     Firestore Database → Start collection → Collection ID: pretestRahasia
+//     → Document ID: admin → Field: hash (string) → isi dengan sidik jari
+//     SHA-256 token admin, yaitu nilai yang sama dengan `hashAdmin` di
+//     assets/konfig.js. Dapatkan dengan:
+//         node scripts/hash-token.mjs "TOKEN-ADMIN-ANDA"
+//     Tanpa dokumen ini, Ruang Admin tidak akan bisa menyimpan sesi.
 //
+//  2) ATURAN
+//     A. Proyek Firebase BARU khusus pre-test:
+//        Console → Firestore → Rules → hapus isinya → tempel SELURUH berkas
+//        ini → Publish.
+//     B. Menumpang proyek emondak-faee8 (bawaan assets/firebase-config.js):
+//        JANGAN menimpa aturan yang ada — monev-dak memakainya. Salin HANYA
+//        ketiga blok `match /pretest…` di bawah, tempel di dalam
+//        `match /databases/{database}/documents { … }` TEPAT SEBELUM blok
+//        penutup `match /{document=**}`, lalu Publish.
+//        https://console.firebase.google.com/u/0/project/emondak-faee8/firestore/rules
+//
+// ───────────────────────────────────────────────────────────────────────────
 // PRINSIPNYA
-//  - Peserta masuk tanpa akun (tanpa Firebase Auth), jadi dokumen boleh
-//    DIBUAT tanpa login — tetapi isinya diperiksa ketat oleh aturan di bawah.
-//  - Dokumen hanya boleh DIBUAT sekali. Ubah dan hapus ditolak untuk semua
-//    orang; membersihkan data uji coba dilakukan lewat Firebase Console.
-//  - Dokumen boleh DIBACA siapa pun karena papan peringkat memerlukannya.
-//    Catatan privasi: email peserta ikut tersimpan di dokumen yang sama,
-//    jadi email secara teknis ikut terbaca. Bila email dianggap sensitif,
-//    aktifkan Firebase Auth untuk admin lalu ganti `allow read: if true;`
-//    menjadi aturan berbasis email admin (lihat README).
+//  - Peserta masuk tanpa kata sandi dan tanpa Firebase Auth, jadi dokumen
+//    boleh dibuat tanpa login — tetapi isinya diperiksa ketat.
+//  - Nilai hanya boleh DIBUAT sekali; ubah dan hapus ditolak untuk semua
+//    orang. Membersihkan data uji coba dilakukan lewat Firebase Console.
+//  - Sesi ujian (buka/tutup, token, jadwal) hanya bisa ditulis oleh yang
+//    mengetahui token admin: penulis harus menyertakan field `kunci` berisi
+//    SHA-256 token itu, dan aturan membandingkannya dengan dokumen
+//    pretestRahasia/admin yang tidak dapat dibaca klien.
+//  - Catatan privasi: email peserta ikut tersimpan pada dokumen yang boleh
+//    dibaca umum (papan peringkat memerlukan koleksi hasil). Bila email
+//    dianggap sensitif, aktifkan Firebase Auth untuk admin lalu ganti
+//    `allow read: if true;` dengan aturan berbasis email admin — lihat
+//    monev-dak/firestore.rules sebagai contoh.
 // ═══════════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── sidik jari token admin ──────────────────────────────────────────
+    // Diisi manual dari Firebase Console. Klien tidak boleh membaca maupun
+    // menulisnya; aturan di bawah tetap dapat memakainya lewat get().
+    match /pretestRahasia/{dok} {
+      allow read, write: if false;
+    }
+
+    function kunciAdminBenar() {
+      return request.resource.data.kunci is string
+        && request.resource.data.kunci ==
+           get(/databases/$(database)/documents/pretestRahasia/admin).data.hash;
+    }
+
+    // ── sesi ujian: hanya admin yang boleh mengubah ─────────────────────
+    match /pretestSesi/{id} {
+      allow read: if true;
+      allow write: if kunciAdminBenar();
+    }
+
+    // ── akun peserta ────────────────────────────────────────────────────
+    // Dibuat sendiri oleh peserta saat mendaftar. Boleh diperbarui (mis.
+    // instansi pindah), tetapi tidak boleh dihapus dari aplikasi.
+    match /pretestAkun/{idAkun} {
+      allow read: if true;
+
+      allow create, update: if
+           request.resource.data.nama is string
+        && request.resource.data.nama.size() >= 3
+        && request.resource.data.nama.size() <= 120
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.emailKunci is string
+        && request.resource.data.emailKunci == request.resource.data.email.lower()
+        && request.resource.data.instansi is string
+        && request.resource.data.instansi.size() >= 3
+        && request.resource.data.instansi.size() <= 160;
+
+      allow delete: if false;
+    }
+
+    // ── hasil ujian ─────────────────────────────────────────────────────
     match /pretestHasil/{id} {
       allow read: if true;
 
@@ -48,8 +110,8 @@ service cloud.firestore {
         && request.resource.data.instansi.size() >= 3
         && request.resource.data.instansi.size() <= 160
 
-        && request.resource.data.token is string
-        && request.resource.data.token.size() <= 40
+        && request.resource.data.sesiKode is string
+        && request.resource.data.sesiKode.size() <= 40
 
         && request.resource.data.total is int
         && request.resource.data.total > 0
@@ -61,6 +123,10 @@ service cloud.firestore {
         && request.resource.data.skor is int
         && request.resource.data.skor >= 0
         && request.resource.data.skor <= 100
+
+        && request.resource.data.poin is int
+        && request.resource.data.poin >= 0
+        && request.resource.data.poin <= request.resource.data.total * 1500
 
         && request.resource.data.durasiDetik is int
         && request.resource.data.durasiDetik >= 0
