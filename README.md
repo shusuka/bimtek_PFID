@@ -39,7 +39,7 @@ pada jendela waktu yang dibuka panitia.
 | `assets/app.js` | Perute halaman, kuis, papan peringkat, ruang admin |
 | `assets/firebase-config.js` | Kunci proyek Firebase + nama koleksi |
 | `firestore.rules` | Aturan keamanan Firestore beserta cara memasangnya |
-| `server.mjs` | Peladen statis untuk pratinjau lokal (tidak dipakai Vercel) |
+| `dev-server.mjs` | Peladen statis untuk pratinjau lokal (tidak diunggah ke Vercel) |
 
 Alamat di dalam situs: `#/` beranda · `#/cara` · `#/akun` · `#/lobi` ·
 `#/tes` · `#/hasil` · `#/peringkat` · `#/admin` · `#/bantuan`
@@ -49,7 +49,7 @@ Alamat di dalam situs: `#/` beranda · `#/cara` · `#/akun` · `#/lobi` ·
 ## Menjalankan di komputer sendiri
 
 ```bash
-node server.mjs
+node dev-server.mjs
 ```
 
 Lalu buka <http://localhost:3900>.

@@ -1,0 +1,6 @@
+# Peladen pratinjau lokal — jangan ikut diunggah ke Vercel. Kalau ikut,
+# Vercel mengira proyek ini aplikasi Node dan menjalankannya sebagai fungsi,
+# sehingga situs statisnya tidak pernah tersaji.
+dev-server.mjs
+firestore.rules
+README.md

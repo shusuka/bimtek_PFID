@@ -1,7 +1,12 @@
 /* Peladen statis untuk pratinjau lokal.
-   Jalankan:  node server.mjs      lalu buka http://localhost:3900
+   Jalankan:  node dev-server.mjs  lalu buka http://localhost:3900
    Dipakai supaya halaman terbuka lewat http:// (bukan file://) sehingga
-   Firebase dan Web Crypto ikut aktif. Vercel tidak memakai berkas ini. */
+   Firebase ikut aktif.
+
+   Vercel tidak memakai berkas ini. Namanya sengaja BUKAN server.mjs dan ikut
+   disebut di .vercelignore: dengan nama itu Vercel mengira proyeknya aplikasi
+   Node, menjalankannya sebagai fungsi, lalu seluruh halaman balas 404 karena
+   berkas statisnya tidak ikut dalam bundel. */
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
