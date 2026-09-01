@@ -118,7 +118,7 @@ Token bawaan: **`K9UP-C32D-5F5A-FV4H`**. Ganti sebelum dipakai sungguhan:
 node scripts/hash-token.mjs "TOKEN-BARU-ANDA"
 ```
 
-Tempel `hashAdmin` yang tercetak ke **dua tempat**:
+Tempel `hashAdmin` yang tercetak ke **dua tempat**, dan keduanya harus sama:
 
 1. `assets/konfig.js` — untuk membuka Ruang Admin di peramban;
 2. dokumen Firestore `pretestRahasia/admin`, field `hash` — untuk mengizinkan
@@ -126,12 +126,19 @@ Tempel `hashAdmin` yang tercetak ke **dua tempat**:
 
 Yang tersimpan di repo maupun di Firestore hanya sidik jarinya, bukan tokennya.
 
+Sidik jari token bawaan `K9UP-C32D-5F5A-FV4H` adalah:
+
+```
+208d4f0cf1941ee2f655fc3ef422dc970bd0ed613c097c46119c53ab56ed6437
+```
+
 ---
 
 ## Basis data
 
-Bawaannya menumpang proyek Firebase `emondak-faee8` (proyek yang sama dengan
-monev-dak) pada koleksi terpisah:
+Proyek Firebase khusus: **`bimtek-pfid`**
+([console](https://console.firebase.google.com/u/0/project/bimtek-pfid/firestore)).
+Koleksinya:
 
 | Koleksi | Isi |
 | --- | --- |
@@ -140,11 +147,14 @@ monev-dak) pada koleksi terpisah:
 | `pretestHasil/{auto}` | nilai akhir tiap peserta |
 | `pretestRahasia/admin` | sidik jari token admin; tidak dapat dibaca klien |
 
-Sebelum dipakai, **dua hal wajib disiapkan manual** di Firebase Console — dokumen
-`pretestRahasia/admin` dan aturan keamanannya. Petunjuk lengkap ada di bagian
-atas `firestore.rules`. Ringkasnya: salin ketiga blok `match /pretest…` dan
-tempel sebelum blok penutup `match /{document=**}` pada aturan yang sudah ada.
-Jangan menimpa seluruh aturan lama; monev-dak masih memakainya.
+Dua hal disiapkan manual di Firebase Console (petunjuk lengkap di bagian atas
+`firestore.rules`):
+
+1. **Aturan keamanan** — tempel seluruh isi `firestore.rules` ke Console → Rules
+   → Publish. *(sudah dipasang)*
+2. **Dokumen `pretestRahasia/admin`** dengan field `hash` berisi sidik jari
+   SHA-256 token admin — nilai yang sama persis dengan `hashAdmin` di
+   `assets/konfig.js`. Tanpa dokumen ini Ruang Admin tidak bisa membuka sesi.
 
 Aturannya: dokumen boleh dibuat siapa pun (peserta memang tidak login) tetapi
 isinya diperiksa ketat, **ubah dan hapus ditolak untuk semua orang** — nilai

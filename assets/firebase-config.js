@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   KONFIGURASI FIREBASE — proyek: emondak-faee8
+   KONFIGURASI FIREBASE — proyek: bimtek-pfid
 
    Sumber: Firebase Console → Project settings → General → "Your apps"
    → Web app → SDK setup and configuration → Config.
@@ -11,17 +11,20 @@
    Bila apiKey dikosongkan, atau halaman dibuka lewat file://, aplikasi
    otomatis berjalan dalam MODE LOKAL: data tersimpan di localStorage
    peramban dan pita penanda muncul di kiri bawah halaman.
+
+   Catatan: measurementId hanya dipakai Google Analytics. Aplikasi ini
+   tidak memuat modul analytics — hanya Firestore — jadi barisnya
+   dibiarkan saja tanpa efek apa pun.
    ══════════════════════════════════════════════════════════════════ */
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCA3nmnzorjN-Uv8lVbKap2Xr6pOI0FJ9Y",
-  authDomain: "emondak-faee8.firebaseapp.com",
-  projectId: "emondak-faee8",
-  storageBucket: "emondak-faee8.firebasestorage.app",
-  messagingSenderId: "336729923549",
-  appId: "1:336729923549:web:e8034bbdd0d0f8d59e2034",
-  measurementId: "G-1J3LRR681W"
+  apiKey: "AIzaSyCMke3t3gottJJkymkJXcV3RywObDLXyh4",
+  authDomain: "bimtek-pfid.firebaseapp.com",
+  projectId: "bimtek-pfid",
+  storageBucket: "bimtek-pfid.firebasestorage.app",
+  messagingSenderId: "366975898573",
+  appId: "1:366975898573:web:d6c313938c3e65901d6a84",
+  measurementId: "G-YFHNEC2ZGK"
 };
 
 // Nama koleksi Firestore tempat hasil pre-test disimpan.
-// Sengaja dipisah dari koleksi `hasil` milik aplikasi monev-dak.
 window.KOLEKSI_HASIL = "pretestHasil";

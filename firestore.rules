@@ -11,26 +11,23 @@ rules_version = '2';
 //                           dibaca siapa pun; hanya dipakai aturan di bawah
 //
 // ───────────────────────────────────────────────────────────────────────────
-// LANGKAH PEMASANGAN (WAJIB, dua bagian)
+// LANGKAH PEMASANGAN (WAJIB, dua bagian) — proyek bimtek-pfid
 //
-//  1) DOKUMEN RAHASIA — sekali saja, lewat Firebase Console
+//  1) ATURAN  ✔ sudah dipasang
+//     Console → Firestore Database → Rules → hapus isinya → tempel SELURUH
+//     berkas ini → Publish.
+//     https://console.firebase.google.com/u/0/project/bimtek-pfid/firestore/rules
+//
+//  2) DOKUMEN RAHASIA — sekali saja, lewat Firebase Console
 //     Firestore Database → Start collection → Collection ID: pretestRahasia
 //     → Document ID: admin → Field: hash (string) → isi dengan sidik jari
-//     SHA-256 token admin, yaitu nilai yang sama dengan `hashAdmin` di
-//     assets/konfig.js. Dapatkan dengan:
+//     SHA-256 token admin, yaitu nilai yang sama persis dengan `hashAdmin`
+//     di assets/konfig.js. Dapatkan dengan:
 //         node scripts/hash-token.mjs "TOKEN-ADMIN-ANDA"
-//     Tanpa dokumen ini, Ruang Admin tidak akan bisa menyimpan sesi.
-//
-//  2) ATURAN
-//     A. Proyek Firebase BARU khusus pre-test:
-//        Console → Firestore → Rules → hapus isinya → tempel SELURUH berkas
-//        ini → Publish.
-//     B. Menumpang proyek emondak-faee8 (bawaan assets/firebase-config.js):
-//        JANGAN menimpa aturan yang ada — monev-dak memakainya. Salin HANYA
-//        ketiga blok `match /pretest…` di bawah, tempel di dalam
-//        `match /databases/{database}/documents { … }` TEPAT SEBELUM blok
-//        penutup `match /{document=**}`, lalu Publish.
-//        https://console.firebase.google.com/u/0/project/emondak-faee8/firestore/rules
+//     Tanpa dokumen ini, Ruang Admin TIDAK dapat menyimpan atau membuka sesi
+//     (Firestore menolaknya dengan permission-denied) — peserta pun tidak
+//     akan pernah bisa masuk. Isian koleksi & dokumen lain dibuat sendiri
+//     oleh aplikasi.
 //
 // ───────────────────────────────────────────────────────────────────────────
 // PRINSIPNYA
@@ -139,8 +136,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // tutup koleksi lain (HAPUS blok ini bila aturan ditempel ke proyek
-    // emondak-faee8 — di sana sudah ada penutup yang sama)
+    // tutup koleksi lain
     match /{document=**} {
       allow read, write: if false;
     }

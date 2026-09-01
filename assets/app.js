@@ -908,16 +908,30 @@
     }
 
     // Papan ikut hidup: peserta yang baru selesai langsung muncul.
-    lepasPantau = window.DB.pantauHasil((daftar) => {
+    // Yang ditampilkan hanya sesi yang sedang berjalan, supaya nilai angkatan
+    // lama tidak bercampur dengan angkatan yang sedang diuji.
+    let kodeSesi = null;
+    window.DB.ambilSesi()
+      .then(dok => { sesi = dok; kodeSesi = dok && dok.kode ? dok.kode : null; gambar(); })
+      .catch(() => gambar());
+
+    let terakhir = null;
+    const gambar = () => {
       const kotak = $('#isiPeringkat');
-      if (!kotak) return;
-      kotak.innerHTML = isiPapan(urutkan(daftar));
-    });
+      if (!kotak || !terakhir) return;
+      const saring = kodeSesi ? terakhir.filter(p => p.sesiKode === kodeSesi) : terakhir;
+      kotak.innerHTML = isiPapan(urutkan(saring), sesi);
+    };
+
+    lepasPantau = window.DB.pantauHasil((daftar) => { terakhir = daftar; gambar(); });
   }
 
-  function isiPapan(daftar) {
+  function isiPapan(daftar, sesiIni) {
+    const judulSesi = sesiIni && sesiIni.judul
+      ? `<p class="ket-halaman" style="margin:-14px 0 20px">Sesi: <b style="color:#fff">${aman(sesiIni.judul)}</b></p>`
+      : '';
     if (!daftar.length) {
-      return '<div class="kartu"><div class="kosong">Belum ada peserta yang menyelesaikan ujian.</div></div>';
+      return judulSesi + '<div class="kartu"><div class="kosong">Belum ada peserta yang menyelesaikan ujian.</div></div>';
     }
     const medali = K.medali || ['emas', 'perak', 'perunggu'];
     const tigaBesar = daftar.slice(0, 3);
@@ -936,7 +950,7 @@
         </div>`;
     }).join('');
 
-    return `
+    return judulSesi + `
       <div class="podium">${mimbar}</div>
       <div class="tabel-bungkus">
         <table class="tabel">
