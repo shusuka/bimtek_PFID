@@ -13,15 +13,16 @@ seperti `monev-dak`. Cukup unggah berkasnya, situsnya jalan.
 ## Alur singkat
 
 ```
-Peserta :  akun (nama, email, instansi)  →  lobi (token + hitung mundur)
+Peserta :  akun (nama, email, pemda)  →  lobi (token + hitung mundur)
            →  20 soal berpoin  →  hasil & pembahasan  →  papan juara
 
-Admin   :  token admin  →  atur & buka sesi  →  pantau langsung  →  rekap CSV
+Admin   :  akun panitia  →  atur & buka sesi  →  pantau langsung  →  rekap CSV
 ```
 
-Tidak ada kata sandi di mana pun. Peserta dikenali dari **email**, dan yang
-menjaga ujian tetap serentak adalah **token sesi** yang hanya berlaku pada
-jendela waktu yang ditentukan admin.
+Peserta tidak memakai kata sandi sama sekali: mereka dikenali dari **email**
+yang diketik sendiri, dan memilih pemda dari daftar seluruh Indonesia. Yang
+menjaga ujian tetap serentak adalah **token sesi 6 karakter** yang hanya berlaku
+pada jendela waktu yang dibuka panitia.
 
 ---
 
@@ -31,14 +32,14 @@ jendela waktu yang ditentukan admin.
 | --- | --- |
 | `index.html` | Halaman muka (hero video satu layar penuh) + rangka aplikasi |
 | `assets/style.css` | Seluruh gaya tampilan: tema hitam, ubin jawaban, animasi |
-| `assets/konfig.js` | Nilai bawaan sesi, rumus poin, sidik jari token admin |
+| `assets/konfig.js` | Nilai bawaan sesi dan rumus poin |
+| `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
 | `assets/soal.js` | Bank soal 25 butir dari berkas .docx penyelenggara |
 | `assets/data.js` | Lapisan penyimpanan: Firestore atau localStorage |
 | `assets/app.js` | Perute halaman, kuis, papan peringkat, ruang admin |
 | `assets/firebase-config.js` | Kunci proyek Firebase + nama koleksi |
 | `firestore.rules` | Aturan keamanan Firestore beserta cara memasangnya |
 | `server.mjs` | Peladen statis untuk pratinjau lokal (tidak dipakai Vercel) |
-| `scripts/hash-token.mjs` | Pembuat sidik jari SHA-256 untuk token admin |
 
 Alamat di dalam situs: `#/` beranda · `#/cara` · `#/akun` · `#/lobi` ·
 `#/tes` · `#/hasil` · `#/peringkat` · `#/admin` · `#/bantuan`
@@ -53,16 +54,17 @@ node server.mjs
 
 Lalu buka <http://localhost:3900>.
 
-Selalu lewat `http://`, jangan klik ganda `index.html` — Firebase dan Web Crypto
-tidak aktif pada `file://`, dan aplikasi akan turun ke **mode lokal** (pita kuning
+Selalu lewat `http://`, jangan klik ganda `index.html` — Firebase tidak aktif
+pada `file://`, dan aplikasi akan turun ke **mode lokal** (pita kuning
 di kiri bawah, data hanya mengendap di peramban itu). Mode lokal berguna untuk
-gladi bersih: seluruh alur, termasuk kendali sesi, tetap jalan tanpa jaringan.
+gladi bersih: seluruh alur tetap jalan tanpa jaringan, dan Ruang Admin terbuka
+tanpa pemeriksaan karena tidak ada yang bisa diperiksa.
 
 ---
 
 ## Menjalankan sesi (panitia)
 
-1. Buka `#/admin`, masukkan token admin.
+1. Buka `#/admin`, masuk dengan email dan kata sandi akun panitia.
 2. Isi **kode sesi** (mis. `BIMTEK-01`, pembeda rekap antar angkatan),
    **token peserta** yang akan dibagikan di kelas, judul, jumlah soal, dan
    detik per soal.
@@ -110,27 +112,21 @@ memakai urutan internasional, ubah `medali` di `assets/konfig.js` menjadi
 
 ---
 
-## Token admin
+## Akun panitia
 
-Token bawaan: **`K9UP-C32D-5F5A-FV4H`**. Ganti sebelum dipakai sungguhan:
+Panitia memakai **Firebase Authentication**; akunnya dibuat langsung di Firebase
+Console, bukan dari dalam aplikasi:
 
-```bash
-node scripts/hash-token.mjs "TOKEN-BARU-ANDA"
-```
+1. Console → **Authentication → Sign-in method** → aktifkan **Email/Password**.
+2. **Users → Add user** → isi email dan kata sandi panitia.
+3. Tulis email itu pada fungsi `emailAdmin()` di `firestore.rules`, lalu Publish.
 
-Tempel `hashAdmin` yang tercetak ke **dua tempat**, dan keduanya harus sama:
+Sesudah itu Ruang Admin (`#/admin`) dibuka dengan email dan kata sandi tersebut.
+Firebase mengingat keadaan masuk, jadi menyegarkan halaman tidak mengeluarkan
+panitia dari papan.
 
-1. `assets/konfig.js` — untuk membuka Ruang Admin di peramban;
-2. dokumen Firestore `pretestRahasia/admin`, field `hash` — untuk mengizinkan
-   penyimpanan pengaturan sesi (lihat `firestore.rules`).
-
-Yang tersimpan di repo maupun di Firestore hanya sidik jarinya, bukan tokennya.
-
-Sidik jari token bawaan `K9UP-C32D-5F5A-FV4H` adalah:
-
-```
-208d4f0cf1941ee2f655fc3ef422dc970bd0ed613c097c46119c53ab56ed6437
-```
+Tidak ada token admin, tidak ada kata sandi yang tersimpan di repo. Peserta tetap
+tanpa akun Firebase — mereka dikenali dari email yang diketik sendiri.
 
 ---
 
@@ -142,31 +138,25 @@ Koleksinya:
 
 | Koleksi | Isi |
 | --- | --- |
-| `pretestAkun/{idAkun}` | profil peserta — nama, email, instansi |
+| `pretestAkun/{idAkun}` | profil peserta — nama, email, pemda, provinsi |
 | `pretestSesi/aktif` | jadwal & token sesi yang sedang berjalan |
 | `pretestHasil/{auto}` | nilai akhir tiap peserta |
-| `pretestRahasia/admin` | sidik jari token admin; tidak dapat dibaca klien |
 
-Dua hal disiapkan manual di Firebase Console (petunjuk lengkap di bagian atas
-`firestore.rules`):
-
-1. **Aturan keamanan** — tempel seluruh isi `firestore.rules` ke Console → Rules
-   → Publish. *(sudah dipasang)*
-2. **Dokumen `pretestRahasia/admin`** dengan field `hash` berisi sidik jari
-   SHA-256 token admin — nilai yang sama persis dengan `hashAdmin` di
-   `assets/konfig.js`. Tanpa dokumen ini Ruang Admin tidak bisa membuka sesi.
+Yang disiapkan manual di Firebase Console (petunjuk lengkap di bagian atas
+`firestore.rules`): **akun panitia** di Authentication, **daftar email panitia**
+pada fungsi `emailAdmin()`, dan **aturan keamanan** yang ditempel lalu Publish.
 
 Aturannya: dokumen boleh dibuat siapa pun (peserta memang tidak login) tetapi
-isinya diperiksa ketat, **ubah dan hapus ditolak untuk semua orang** — nilai
-terkunci begitu terkirim. Pengaturan sesi hanya bisa ditulis oleh yang mengetahui
-token admin. Membersihkan data uji coba dilakukan dari Firebase Console.
+isinya diperiksa ketat. Nilai **tidak bisa diubah oleh siapa pun**, termasuk
+panitia — terkunci begitu terkirim. Yang boleh dilakukan panitia adalah
+menghapus rekaman (tombol ✕ pada tabel rekap) dan menulis pengaturan sesi.
 
-> **Catatan privasi.** Papan peringkat hanya menampilkan nama, instansi, dan
-> poin, tetapi email peserta tersimpan pada dokumen yang sama dan secara teknis
-> ikut terbaca oleh siapa pun yang membuka koleksinya. Untuk bimtek internal ini
-> dianggap memadai. Bila email dinilai sensitif, aktifkan Firebase Auth untuk
-> akun admin lalu ganti `allow read: if true;` menjadi aturan berbasis email
-> admin seperti pada `monev-dak/firestore.rules`.
+> **Catatan privasi.** Papan peringkat hanya menampilkan nama, pemda, dan poin,
+> tetapi email peserta tersimpan pada dokumen yang sama dan secara teknis ikut
+> terbaca oleh siapa pun yang membuka koleksinya. Untuk bimtek internal ini
+> dianggap memadai. Bila email dinilai sensitif, ubah `allow read: if true;`
+> pada `pretestHasil` dan `pretestAkun` menjadi `if isAdmin();` —
+> konsekuensinya papan peringkat hanya bisa dibuka panitia.
 
 Ingin memakai proyek Firebase sendiri? Ganti isi `assets/firebase-config.js`
 dengan konfigurasi proyek baru, lalu tempel seluruh `firestore.rules` di sana.

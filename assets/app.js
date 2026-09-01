@@ -40,6 +40,81 @@
     return a;
   }
 
+  /* ── Daftar pemda seluruh Indonesia (assets/wilayah.js) ───────── */
+
+  const WILAYAH = window.WILAYAH || {};
+  const PEMDA = Object.entries(WILAYAH)
+    .flatMap(([prov, daftar]) => daftar.map(nama => ({ nama, prov })));
+  const PETA_PEMDA = new Map(PEMDA.map(p => [p.nama.toLowerCase(), p]));
+
+  const pemdaSah = (nama) => PETA_PEMDA.has(String(nama || '').trim().toLowerCase());
+  const provinsiDari = (nama) => {
+    const p = PETA_PEMDA.get(String(nama || '').trim().toLowerCase());
+    return p ? p.prov : '';
+  };
+
+  /* Kotak isian pemda yang bisa diketik lalu dipilih dari daftar.
+     Dipakai di formulir akun; 552 pilihan terlalu banyak untuk <select>
+     biasa, jadi daftarnya disaring sambil mengetik. */
+  function pasangPilihPemda(kotakId, daftarId) {
+    const kotak = document.getElementById(kotakId);
+    const daftar = document.getElementById(daftarId);
+    if (!kotak || !daftar) return;
+    let sorot = -1;
+    let tampil = [];
+
+    const tutup = () => { daftar.hidden = true; sorot = -1; kotak.setAttribute('aria-expanded', 'false'); };
+
+    const gambar = () => {
+      const kata = kotak.value.trim().toLowerCase();
+      tampil = (kata
+        ? PEMDA.filter(p => p.nama.toLowerCase().includes(kata) || p.prov.toLowerCase().includes(kata))
+        : PEMDA).slice(0, 60);
+      if (!tampil.length) {
+        daftar.innerHTML = '<div class="pilih-kosong">Tidak ada pemda yang cocok</div>';
+      } else {
+        daftar.innerHTML = tampil.map((p, i) => `
+          <div class="pilih-item${i === sorot ? ' sorot' : ''}" data-i="${i}" role="option">
+            ${aman(p.nama)}<small>${aman(p.prov)}</small>
+          </div>`).join('');
+      }
+      daftar.hidden = false;
+      kotak.setAttribute('aria-expanded', 'true');
+    };
+
+    const pilih = (i) => {
+      if (!tampil[i]) return;
+      kotak.value = tampil[i].nama;
+      kotak.dataset.prov = tampil[i].prov;
+      tutup();
+    };
+
+    kotak.addEventListener('focus', gambar);
+    kotak.addEventListener('input', () => { sorot = -1; gambar(); });
+    kotak.addEventListener('keydown', (ev) => {
+      if (daftar.hidden) return;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        sorot = Math.max(0, Math.min(tampil.length - 1, sorot + (ev.key === 'ArrowDown' ? 1 : -1)));
+        gambar();
+        const el = daftar.querySelector('.sorot');
+        if (el) el.scrollIntoView({ block: 'nearest' });
+      } else if (ev.key === 'Enter' && sorot >= 0) {
+        ev.preventDefault();
+        pilih(sorot);
+      } else if (ev.key === 'Escape') {
+        tutup();
+      }
+    });
+    daftar.addEventListener('mousedown', (ev) => {
+      const item = ev.target.closest('.pilih-item');
+      if (!item) return;
+      ev.preventDefault();
+      pilih(Number(item.dataset.i));
+    });
+    kotak.addEventListener('blur', () => setTimeout(tutup, 120));
+  }
+
   const BENTUK = ['▲', '◆', '●', '■'];
   const WARNA_UBIN = ['merah', 'biru', 'kuning', 'hijau'];
 
@@ -76,64 +151,16 @@
 
   const angkaRapi = (n) => Number(n || 0).toLocaleString('id-ID');
 
-  // SHA-256: pakai Web Crypto bila tersedia; bila tidak (mis. halaman
-  // dibuka lewat file://), jatuh ke penghitungan murni JavaScript.
-  async function sha256(teks) {
-    if (window.crypto && window.crypto.subtle) {
-      try {
-        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(teks));
-        return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-      } catch (e) { /* lanjut ke cadangan */ }
-    }
-    return sha256Murni(teks);
-  }
-
-  function sha256Murni(pesan) {
-    const K256 = [
-      0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-      0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-      0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-      0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-      0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-      0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-      0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-      0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
-    let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
-
-    const byte = [];
-    for (const ch of unescape(encodeURIComponent(pesan))) byte.push(ch.charCodeAt(0));
-    const bitLen = byte.length * 8;
-    byte.push(0x80);
-    while (byte.length % 64 !== 56) byte.push(0);
-    for (let i = 7; i >= 0; i--) byte.push(Math.floor(bitLen / Math.pow(2, i * 8)) & 0xff);
-
-    const rotr = (x, n) => (x >>> n) | (x << (32 - n));
-    const w = new Array(64);
-
-    for (let p = 0; p < byte.length; p += 64) {
-      for (let i = 0; i < 16; i++) {
-        w[i] = (byte[p + i * 4] << 24) | (byte[p + i * 4 + 1] << 16)
-             | (byte[p + i * 4 + 2] << 8) | byte[p + i * 4 + 3];
-      }
-      for (let i = 16; i < 64; i++) {
-        const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-        const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
-      }
-      let [a, b, c, d, e, f, g, h] = H;
-      for (let i = 0; i < 64; i++) {
-        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-        const ch = (e & f) ^ (~e & g);
-        const t1 = (h + S1 + ch + K256[i] + w[i]) | 0;
-        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-        const maj = (a & b) ^ (a & c) ^ (b & c);
-        const t2 = (S0 + maj) | 0;
-        h = g; g = f; f = e; e = (d + t1) | 0;
-        d = c; c = b; b = a; a = (t1 + t2) | 0;
-      }
-      H = H.map((x, i) => (x + [a, b, c, d, e, f, g, h][i]) | 0);
-    }
-    return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  // Token peserta: 6 karakter huruf & angka, tanpa I O 0 1 supaya tidak salah
+  // dibaca saat dituliskan di papan tulis atau dibacakan ke kelas.
+  function tokenAcak(panjang) {
+    const abjad = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const n = panjang || 6;
+    const acakan = new Uint32Array(n);
+    (window.crypto || {}).getRandomValues
+      ? crypto.getRandomValues(acakan)
+      : acakan.forEach((_, i) => { acakan[i] = Math.floor(Math.random() * 4294967296); });
+    return Array.from(acakan, x => abjad[x % abjad.length]).join('');
   }
 
   /* ── Suara (mati secara bawaan) ──────────────────────────────── */
@@ -187,6 +214,7 @@
   let main = null;    // keadaan ujian yang sedang berjalan
   let hasil = null;   // hasil terakhir
   let sesi = null;    // dokumen sesi dari Firestore
+  let adminMasuk = null;  // akun panitia yang sedang masuk (Firebase Auth)
   let lepasPantau = null; // penghenti langganan onSnapshot halaman aktif
   let jamId = null;
 
@@ -355,9 +383,15 @@
                 <label for="fNama">Nama lengkap</label>
                 <input id="fNama" name="nama" type="text" autocomplete="name" placeholder="mis. Budi Santoso, S.T." />
               </div>
-              <div class="kolom" style="margin-top:16px">
-                <label for="fInstansi">Instansi asal</label>
-                <input id="fInstansi" name="instansi" type="text" placeholder="mis. Dinas PUPR Kab. Deli Serdang" />
+              <div class="kolom kolom-pilih" style="margin-top:16px">
+                <label for="fInstansi">Pemerintah daerah</label>
+                <div class="pilih-bungkus">
+                  <input id="fInstansi" name="instansi" type="text" autocomplete="off" spellcheck="false"
+                         role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="daftarPemda"
+                         placeholder="ketik nama kabupaten/kota, mis. Karo" />
+                  <div class="pilih-daftar" id="daftarPemda" role="listbox" hidden></div>
+                </div>
+                <span class="petunjuk">Pilih dari daftar — 514 kabupaten/kota dan 38 provinsi se-Indonesia.</span>
               </div>
               <div class="kolom" style="margin-top:16px">
                 <label for="fJabatan">Jabatan <span style="text-transform:none;letter-spacing:0">(boleh dikosongkan)</span></label>
@@ -401,7 +435,10 @@
         tombol.disabled = false;
 
         if (ada) {
-          akun = { nama: ada.nama, email: ada.email, instansi: ada.instansi, jabatan: ada.jabatan || '' };
+          akun = {
+            nama: ada.nama, email: ada.email, instansi: ada.instansi,
+            provinsi: ada.provinsi || provinsiDari(ada.instansi), jabatan: ada.jabatan || ''
+          };
           simpanAkunLokal();
           ke('#/lobi');
           return;
@@ -418,21 +455,29 @@
       const instansi = form.instansi.value.trim();
       const jabatan = form.jabatan.value.trim();
       if (nama.length < 3) { kotak.innerHTML = '<div class="pesan pesan-galat">Nama lengkap belum diisi dengan benar.</div>'; return; }
-      if (instansi.length < 3) { kotak.innerHTML = '<div class="pesan pesan-galat">Instansi asal belum diisi.</div>'; return; }
+      if (!pemdaSah(instansi)) {
+        kotak.innerHTML = '<div class="pesan pesan-galat">Pemerintah daerah harus dipilih dari daftar. ' +
+          'Ketik sebagian namanya, lalu klik pilihan yang muncul.</div>';
+        $('#fInstansi').focus();
+        return;
+      }
+      const provinsi = provinsiDari(instansi);
 
       tombol.disabled = true; tombol.textContent = 'Menyimpan…';
       try {
-        await window.DB.simpanAkun({ nama, email, instansi, jabatan });
+        await window.DB.simpanAkun({ nama, email, instansi, provinsi, jabatan });
       } catch (e) {
         console.warn('[akun] gagal menyimpan:', e);
         kotak.innerHTML = '<div class="pesan pesan-galat">Akun gagal disimpan ke server. Periksa sambungan internet lalu coba lagi.</div>';
         tombol.disabled = false; tombol.textContent = 'Daftarkan akun';
         return;
       }
-      akun = { nama, email, instansi, jabatan };
+      akun = { nama, email, instansi, provinsi, jabatan };
       simpanAkunLokal();
       ke('#/lobi');
     });
+
+    pasangPilihPemda('fInstansi', 'daftarPemda');
   }
 
   /* ── 5c. Lobi ────────────────────────────────────────────────── */
@@ -780,6 +825,7 @@
       email: a.email,
       emailKunci: String(a.email).trim().toLowerCase(),
       instansi: a.instansi,
+      provinsi: a.provinsi || provinsiDari(a.instansi),
       jabatan: a.jabatan || '',
       sesiKode: main.sesiKode,
       sesiJudul: main.sesiJudul,
@@ -901,7 +947,7 @@
         <div id="isiPeringkat" class="kosong">Memuat data…</div>
       </div>`;
 
-    if (K.peringkatTerbuka === false && sessionStorage.getItem('pretest_admin') !== 'ya') {
+    if (K.peringkatTerbuka === false && !adminMasuk) {
       $('#isiPeringkat').outerHTML =
         '<div class="pesan pesan-info">Papan peringkat baru dibuka oleh penyelenggara.</div>';
       return;
@@ -979,20 +1025,30 @@
   /* ── 5g. Ruang admin ─────────────────────────────────────────── */
 
   function halamanAdmin() {
-    if (sessionStorage.getItem('pretest_admin') === 'ya') { papanAdmin(); return; }
+    // Panitia memakai akun Firebase Authentication yang dibuat langsung di
+    // Firebase Console. Firebase memulihkan sendiri keadaan masuk sesudah
+    // halaman dimuat ulang, jadi papan langsung terbuka bila masih masuk.
+    if (adminMasuk) { papanAdmin(); return; }
 
     halaman.innerHTML = kop('Ruang Admin') + `
       <div class="wadah wadah-sempit">
         <div class="label-sudut">Khusus Penyelenggara</div>
         <h1 class="judul-halaman">Masuk <em>ruang admin</em></h1>
-        <p class="ket-halaman">Token admin membuka kendali sesi, pemantauan langsung, dan rekap nilai.</p>
+        <p class="ket-halaman">
+          Akun panitia dibuat di Firebase Console. Masuk untuk mengendalikan sesi,
+          memantau peserta, dan mengunduh rekap.
+        </p>
         <div class="kartu">
           <form class="formulir" id="formAdmin" novalidate>
             <div class="kolom">
-              <label for="fTokenAdmin">Token admin</label>
-              <input id="fTokenAdmin" type="password" autocomplete="off" placeholder="••••-••••-••••-••••" required />
+              <label for="fEmailAdmin">Email panitia</label>
+              <input id="fEmailAdmin" type="email" autocomplete="username" placeholder="panitia@instansi.go.id" required />
             </div>
-            <button class="btn btn-biru btn-blok" type="submit">Buka papan admin</button>
+            <div class="kolom">
+              <label for="fSandiAdmin">Kata sandi</label>
+              <input id="fSandiAdmin" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            </div>
+            <button class="btn btn-biru btn-blok" type="submit" id="btnMasukAdmin">Masuk</button>
           </form>
           <div id="pesanAdmin"></div>
         </div>
@@ -1000,13 +1056,23 @@
 
     $('#formAdmin').addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const cap = await sha256($('#fTokenAdmin').value.trim());
-      if (cap === String(K.hashAdmin || '').toLowerCase()) {
-        sessionStorage.setItem('pretest_admin', 'ya');
-        sessionStorage.setItem('pretest_admin_kunci', cap);
+      const tombol = $('#btnMasukAdmin');
+      tombol.disabled = true; tombol.textContent = 'Memeriksa…';
+      try {
+        adminMasuk = await window.DB.masukAdmin($('#fEmailAdmin').value.trim(), $('#fSandiAdmin').value);
         papanAdmin();
-      } else {
-        $('#pesanAdmin').innerHTML = '<div class="pesan pesan-galat">Token admin salah.</div>';
+      } catch (e) {
+        const pesan = {
+          'auth/invalid-credential': 'Email atau kata sandi salah.',
+          'auth/invalid-email': 'Alamat email tidak sah.',
+          'auth/user-not-found': 'Akun itu belum ada di Firebase Authentication.',
+          'auth/wrong-password': 'Kata sandi salah.',
+          'auth/too-many-requests': 'Terlalu banyak percobaan. Tunggu sebentar lalu ulangi.',
+          'auth/network-request-failed': 'Jaringan bermasalah.',
+          'auth/operation-not-allowed': 'Metode Email/Password belum diaktifkan di Firebase Console → Authentication → Sign-in method.'
+        }[e.code] || ('Gagal masuk: ' + (e.code || e.message));
+        $('#pesanAdmin').innerHTML = '<div class="pesan pesan-galat">' + aman(pesan) + '</div>';
+        tombol.disabled = false; tombol.textContent = 'Masuk';
       }
     });
   }
@@ -1018,6 +1084,9 @@
           <div>
             <div class="label-sudut" style="margin-bottom:4px">Ruang Admin</div>
             <h1 class="judul-halaman" style="margin:0">Kendali <em>sesi ujian</em></h1>
+            <div style="font-size:13px;color:var(--teks-samar);margin-top:6px">
+              Masuk sebagai ${aman((adminMasuk && adminMasuk.email) || 'panitia')}
+            </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <button class="btn btn-kuning" id="btnUnduh">Unduh CSV</button>
@@ -1034,8 +1103,8 @@
       </div>`;
 
     $('#btnKeluarAdmin').onclick = () => {
-      sessionStorage.removeItem('pretest_admin');
-      sessionStorage.removeItem('pretest_admin_kunci');
+      window.DB.keluarAdmin();
+      adminMasuk = null;
       ke('#/');
     };
 
@@ -1090,7 +1159,12 @@
         </div>
         <div class="kolom">
           <label for="sToken">Token peserta</label>
-          <input id="sToken" class="masukan-token" type="text" value="${aman(s.token || '')}" placeholder="BIMTEK2026" />
+          <div class="baris-token">
+            <input id="sToken" class="masukan-token" type="text" maxlength="12" autocapitalize="characters"
+                   spellcheck="false" value="${aman(s.token || '')}" placeholder="A7K2M9" />
+            <button class="btn btn-hantu" id="btnAcakToken" type="button" title="Buat token acak 6 karakter">Acak</button>
+          </div>
+          <span class="petunjuk">6 karakter huruf &amp; angka, dibacakan ke kelas. Tidak peka huruf besar/kecil.</span>
         </div>
         <div class="kolom kolom-lebar">
           <label for="sJudul">Judul sesi</label>
@@ -1139,21 +1213,23 @@
     });
 
     const simpan = async (ubah) => {
-      const kunci = sessionStorage.getItem('pretest_admin_kunci');
       const isi = { ...bacaForm(), ...(ubah || {}) };
       if (!isi.token) {
         $('#pesanSesi').innerHTML = '<div class="pesan pesan-galat">Token peserta belum diisi.</div>';
         return;
       }
       try {
-        await window.DB.simpanSesi(isi, kunci);
+        await window.DB.simpanSesi(isi);
         $('#pesanSesi').innerHTML = '<div class="pesan pesan-info">Pengaturan sesi tersimpan.</div>';
       } catch (e) {
         console.error('[admin] gagal menyimpan sesi:', e);
         $('#pesanSesi').innerHTML = '<div class="pesan pesan-galat">Gagal menyimpan: ' + aman(e.message) +
-          '<br>Pastikan dokumen <b>pretestRahasia/admin</b> di Firestore sudah berisi sidik jari token admin (lihat firestore.rules).</div>';
+          '<br>Bila pesannya soal izin, periksa apakah email akun panitia ini sudah terdaftar pada fungsi ' +
+          '<b>emailAdmin()</b> di firestore.rules.</div>';
       }
     };
+
+    $('#btnAcakToken').onclick = () => { $('#sToken').value = tokenAcak(); };
 
     $('#formSesi').onsubmit = (ev) => { ev.preventDefault(); simpan(); };
     const buka = $('#btnBuka');
@@ -1221,9 +1297,9 @@
       <div class="tabel-bungkus">
         <table class="tabel" id="tabelAdmin">
           <thead>
-            <tr><th>#</th><th>Nama</th><th>Email</th><th>Instansi</th>
+            <tr><th>#</th><th>Nama</th><th>Email</th><th>Pemda</th><th>Provinsi</th>
                 <th class="angka">Poin</th><th class="angka">Nilai</th><th class="angka">Benar</th>
-                <th class="angka">Waktu</th><th>Selesai</th></tr>
+                <th class="angka">Waktu</th><th>Selesai</th><th></th></tr>
           </thead>
           <tbody>
             ${sesiIni.map((p, i) => `
@@ -1232,11 +1308,14 @@
                 <td class="bebas">${aman(p.nama)}</td>
                 <td>${aman(p.email)}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
+                <td>${aman(p.provinsi || provinsiDari(p.instansi))}</td>
                 <td class="angka" style="color:var(--kuning);font-weight:700">${angkaRapi(p.poin || 0)}</td>
                 <td class="angka">${p.skor}</td>
                 <td class="angka">${p.benar}/${p.total}</td>
                 <td class="angka">${mmss(p.durasiDetik)}</td>
                 <td>${aman(tanggalIndo(p.waktuSelesai))}</td>
+                <td><button class="tombol-hapus" data-hapus="${aman(p.id)}" data-nama="${aman(p.nama)}"
+                        title="Hapus rekaman ini">✕</button></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1267,6 +1346,22 @@
            </div>`
         : ''}`;
 
+    const tabel = $('#tabelAdmin');
+    if (tabel) tabel.addEventListener('click', async (ev) => {
+      const tombol = ev.target.closest('[data-hapus]');
+      if (!tombol) return;
+      if (!confirm(`Hapus rekaman nilai atas nama ${tombol.dataset.nama}?\n` +
+        'Rekaman yang dihapus tidak bisa dikembalikan.')) return;
+      tombol.disabled = true;
+      try {
+        await window.DB.hapusHasil(tombol.dataset.hapus);
+        tombol.closest('tr').remove();
+      } catch (e) {
+        tombol.disabled = false;
+        alert('Gagal menghapus: ' + (e.code || e.message));
+      }
+    });
+
     const cari = $('#cari');
     if (cari) cari.oninput = () => {
       const kata = cari.value.trim().toLowerCase();
@@ -1285,11 +1380,12 @@
 
   function unduhCsv(daftar) {
     const baris = [[
-      'Peringkat', 'Nama', 'Email', 'Instansi', 'Jabatan', 'Sesi',
+      'Peringkat', 'Nama', 'Email', 'Pemda', 'Provinsi', 'Jabatan', 'Sesi',
       'Poin', 'Nilai', 'Benar', 'Total', 'Beruntun', 'Durasi (detik)', 'Durasi', 'Waktu Selesai'
     ]];
     daftar.forEach((p, n) => baris.push([
-      n + 1, p.nama, p.email, p.instansi, p.jabatan || '', p.sesiKode || '',
+      n + 1, p.nama, p.email, p.instansi,
+      p.provinsi || provinsiDari(p.instansi), p.jabatan || '', p.sesiKode || '',
       p.poin || 0, p.skor, p.benar, p.total, p.beruntunMaks || 0,
       p.durasiDetik, mmss(p.durasiDetik), tanggalIndo(p.waktuSelesai)
     ]));
@@ -1348,6 +1444,14 @@
 
   muatKeadaan();
   window.addEventListener('hashchange', render);
+
+  // Firebase memulihkan sendiri keadaan masuk panitia sesudah halaman dimuat
+  // ulang; halaman admin digambar ulang begitu pemulihan itu selesai.
+  window.DB.pantauAdmin((pengguna) => {
+    const berubah = !!pengguna !== !!adminMasuk;
+    adminMasuk = pengguna;
+    if (berubah && location.hash === '#/admin') render();
+  });
 
   window.DB.init().then(mode => {
     const pita = $('#pitaLokal');

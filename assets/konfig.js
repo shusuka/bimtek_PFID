@@ -17,7 +17,7 @@ window.KONFIG = {
   sesiBawaan: {
     kode: "BIMTEK-01",
     judul: "Pre-Test BIMTEK eMonDAK Angkatan 1",
-    token: "BIMTEK2026",   // token khusus yang dibagikan di kelas
+    token: "A7K2M9",       // 6 karakter; tombol "Acak" di Ruang Admin membuat yang baru
     jumlahSoal: 20,        // maksimal 21 (grup soal unik di bank soal)
     detikPerSoal: 30,      // hitung mundur tiap butir, ala Kahoot
     poinCepat: true,       // makin cepat menjawab, makin besar poin
@@ -29,13 +29,11 @@ window.KONFIG = {
   poinCepatMaks: 400, // tambahan maksimal bila menjawab seketika
   bonusBeruntun: 50,  // tambahan per jawaban benar beruntun (mulai ke-3)
 
-  // ── Token admin ───────────────────────────────────────────────────
-  // Yang tersimpan hanya sidik jari SHA-256-nya, bukan tokennya.
-  // Token bawaan: K9UP-C32D-5F5A-FV4H
-  // Ganti dengan:  node scripts/hash-token.mjs "TOKEN-BARU-ANDA"
-  // lalu tempel hasilnya di baris hashAdmin ini DAN di dokumen
-  // pretestRahasia/admin pada Firebase Console (lihat firestore.rules).
-  hashAdmin: "208d4f0cf1941ee2f655fc3ef422dc970bd0ed613c097c46119c53ab56ed6437",
+  // ── Akun panitia ──────────────────────────────────────────────────
+  // Tidak ada pengaturannya di sini. Panitia memakai akun Firebase
+  // Authentication yang dibuat langsung di Firebase Console
+  // (Authentication → Users → Add user), dan daftar email yang berhak
+  // ditulis pada fungsi emailAdmin() di firestore.rules.
 
   // ── Papan peringkat ───────────────────────────────────────────────
   // Urutan medali sesuai permintaan penyelenggara.

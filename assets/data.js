@@ -11,8 +11,11 @@
      pretestAkun/{idAkun}   profil peserta (nama, email, instansi)
      pretestSesi/aktif      satu dokumen: jadwal & token sesi berjalan
      pretestHasil/{auto}    nilai akhir tiap peserta
-     pretestRahasia/admin   sidik jari token admin — TIDAK boleh dibaca
-                            klien; hanya dipakai oleh Security Rules
+
+   Peserta tidak memakai akun Firebase sama sekali — mereka dikenali dari
+   email yang diketik sendiri. Yang memakai Firebase Authentication hanya
+   panitia: akunnya dibuat langsung di Firebase Console, dan Security Rules
+   memberi izin menulis sesi berdasarkan email akun itu.
    ══════════════════════════════════════════════════════════════════ */
 (function () {
   const V = 'https://www.gstatic.com/firebasejs/12.0.0';
@@ -27,6 +30,8 @@
     siap: false,
     _fs: null,
     _db: null,
+    _auth: null,
+    _authMod: null,
 
     async init() {
       if (this.siap) return this.mode;
@@ -34,13 +39,16 @@
       const daring = location.protocol === 'http:' || location.protocol === 'https:';
       if (cfg.apiKey && cfg.projectId && daring) {
         try {
-          const [{ initializeApp }, fs] = await Promise.all([
+          const [{ initializeApp }, fs, auth] = await Promise.all([
             import(`${V}/firebase-app.js`),
-            import(`${V}/firebase-firestore.js`)
+            import(`${V}/firebase-firestore.js`),
+            import(`${V}/firebase-auth.js`)
           ]);
           const app = initializeApp(cfg);
           this._fs = fs;
           this._db = fs.getFirestore(app);
+          this._authMod = auth;
+          this._auth = auth.getAuth(app);
           this.mode = 'firebase';
         } catch (e) {
           console.warn('[data] Firebase gagal dimuat, beralih ke mode lokal:', e);
@@ -49,6 +57,36 @@
       }
       this.siap = true;
       return this.mode;
+    },
+
+    /* ── AKUN PANITIA (Firebase Authentication) ────────────────────
+       Akunnya dibuat langsung di Firebase Console → Authentication →
+       Users → Add user. Aplikasi hanya memakainya untuk masuk; tidak
+       ada pendaftaran mandiri di sini. */
+
+    async masukAdmin(email, sandi) {
+      await this.init();
+      if (this.mode !== 'firebase') {
+        // Mode lokal dipakai untuk gladi bersih tanpa jaringan: tidak ada
+        // yang bisa diperiksa, jadi pintunya dibuka apa adanya.
+        return { email: email || 'admin lokal', lokal: true };
+      }
+      const kred = await this._authMod.signInWithEmailAndPassword(this._auth, email, sandi);
+      return kred.user;
+    },
+
+    async keluarAdmin() {
+      await this.init();
+      if (this.mode === 'firebase' && this._auth) await this._authMod.signOut(this._auth);
+    },
+
+    // Memberi tahu saat keadaan masuk/keluar berubah, termasuk sesi yang
+    // dipulihkan sendiri oleh Firebase sesudah halaman dimuat ulang.
+    pantauAdmin(saatBerubah) {
+      this.init().then(() => {
+        if (this.mode !== 'firebase') { saatBerubah(null); return; }
+        this._authMod.onAuthStateChanged(this._auth, saatBerubah);
+      });
     },
 
     get koleksi() { return window.KOLEKSI_HASIL || 'pretestHasil'; },
@@ -82,6 +120,7 @@
         email: akun.email,
         emailKunci: String(akun.email).trim().toLowerCase(),
         instansi: akun.instansi,
+        provinsi: akun.provinsi || '',
         jabatan: akun.jabatan || '',
         dibuat: akun.dibuat || new Date().toISOString()
       };
@@ -120,12 +159,25 @@
     // Menulis sesi memerlukan bukti admin: SHA-256 token admin. Security
     // Rules membandingkannya dengan dokumen pretestRahasia/admin yang tidak
     // dapat dibaca klien, jadi hanya pemegang token yang bisa mengubah sesi.
-    async simpanSesi(sesi, kunciAdmin) {
+    // Hanya panitia yang sudah masuk lewat Firebase Authentication yang
+    // diizinkan aturan Firestore menulis dokumen ini.
+    async simpanSesi(sesi) {
       await this.init();
-      const isi = { ...sesi, kunci: kunciAdmin, diubah: new Date().toISOString() };
+      const isi = {
+        kode: sesi.kode || 'sesi',
+        judul: sesi.judul || '',
+        token: sesi.token || '',
+        mulai: sesi.mulai || null,
+        selesai: sesi.selesai || null,
+        jumlahSoal: Number(sesi.jumlahSoal) || 20,
+        detikPerSoal: Number(sesi.detikPerSoal) || 30,
+        poinCepat: sesi.poinCepat !== false,
+        aktif: !!sesi.aktif,
+        diubah: new Date().toISOString()
+      };
       if (this.mode === 'firebase') {
         const { doc, setDoc } = this._fs;
-        await setDoc(doc(this._db, 'pretestSesi', 'aktif'), isi, { merge: true });
+        await setDoc(doc(this._db, 'pretestSesi', 'aktif'), isi);
       } else {
         this._tulis(KUNCI_SESI, isi);
       }
@@ -219,6 +271,19 @@
       }
       return this._baca(KUNCI_HASIL, []).some(r =>
         (r.emailKunci || '') === kunci && (!sesiKode || r.sesiKode === sesiKode));
+    },
+
+    // Menghapus satu rekaman nilai. Aturan Firestore hanya mengizinkannya
+    // untuk panitia yang sudah masuk — dipakai membersihkan data uji coba
+    // atau peserta yang salah daftar.
+    async hapusHasil(id) {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { doc, deleteDoc } = this._fs;
+        await deleteDoc(doc(this._db, this.koleksi, id));
+        return;
+      }
+      this._tulis(KUNCI_HASIL, this._baca(KUNCI_HASIL, []).filter(r => r.id !== id));
     },
 
     kosongkanLokal() {

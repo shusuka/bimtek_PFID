@@ -1,76 +1,75 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ATURAN FIRESTORE — pre-test BIMTEK eMonDAK
+// ATURAN FIRESTORE — pre-test BIMTEK eMonDAK (proyek bimtek-pfid)
 //
 // Koleksi yang dipakai
-//   pretestAkun/{idAkun}    profil peserta (nama, email, instansi)
+//   pretestAkun/{idAkun}    profil peserta (nama, email, pemda)
 //   pretestSesi/aktif       jadwal & token sesi yang sedang berjalan
 //   pretestHasil/{auto}     nilai akhir tiap peserta
-//   pretestRahasia/admin    sidik jari SHA-256 token admin — TIDAK dapat
-//                           dibaca siapa pun; hanya dipakai aturan di bawah
 //
 // ───────────────────────────────────────────────────────────────────────────
-// LANGKAH PEMASANGAN (WAJIB, dua bagian) — proyek bimtek-pfid
+// LANGKAH PEMASANGAN
 //
-//  1) ATURAN  ✔ sudah dipasang
-//     Console → Firestore Database → Rules → hapus isinya → tempel SELURUH
-//     berkas ini → Publish.
+//  1) AKUN PANITIA — Firebase Console → Authentication
+//     a. Sign-in method → aktifkan penyedia "Email/Password".
+//     b. Users → Add user → isi email dan kata sandi panitia.
+//     Akun itulah yang dipakai masuk ke Ruang Admin (#/admin). Tidak ada
+//     pendaftaran panitia dari dalam aplikasi.
+//
+//  2) DAFTAR EMAIL PANITIA — tulis email dari langkah 1 pada fungsi
+//     emailAdmin() di bawah. Boleh lebih dari satu, pisahkan dengan koma.
+//
+//  3) ATURAN — Console → Firestore Database → Rules → hapus isinya →
+//     tempel SELURUH berkas ini → Publish.
 //     https://console.firebase.google.com/u/0/project/bimtek-pfid/firestore/rules
-//
-//  2) DOKUMEN RAHASIA — sekali saja, lewat Firebase Console
-//     Firestore Database → Start collection → Collection ID: pretestRahasia
-//     → Document ID: admin → Field: hash (string) → isi dengan sidik jari
-//     SHA-256 token admin, yaitu nilai yang sama persis dengan `hashAdmin`
-//     di assets/konfig.js. Dapatkan dengan:
-//         node scripts/hash-token.mjs "TOKEN-ADMIN-ANDA"
-//     Tanpa dokumen ini, Ruang Admin TIDAK dapat menyimpan atau membuka sesi
-//     (Firestore menolaknya dengan permission-denied) — peserta pun tidak
-//     akan pernah bisa masuk. Isian koleksi & dokumen lain dibuat sendiri
-//     oleh aplikasi.
 //
 // ───────────────────────────────────────────────────────────────────────────
 // PRINSIPNYA
-//  - Peserta masuk tanpa kata sandi dan tanpa Firebase Auth, jadi dokumen
-//    boleh dibuat tanpa login — tetapi isinya diperiksa ketat.
-//  - Nilai hanya boleh DIBUAT sekali; ubah dan hapus ditolak untuk semua
-//    orang. Membersihkan data uji coba dilakukan lewat Firebase Console.
-//  - Sesi ujian (buka/tutup, token, jadwal) hanya bisa ditulis oleh yang
-//    mengetahui token admin: penulis harus menyertakan field `kunci` berisi
-//    SHA-256 token itu, dan aturan membandingkannya dengan dokumen
-//    pretestRahasia/admin yang tidak dapat dibaca klien.
+//  - Peserta TIDAK memakai akun Firebase. Mereka mengetik email sendiri, dan
+//    dokumennya boleh dibuat tanpa login — tetapi isinya diperiksa ketat.
+//  - Nilai hanya boleh DIBUAT sekali. Mengubah nilai ditolak untuk semua
+//    orang, termasuk panitia; yang boleh dilakukan panitia hanya menghapus
+//    rekaman (mis. data uji coba atau peserta yang salah daftar).
+//  - Sesi ujian — token, jadwal, tombol buka/tutup — hanya boleh ditulis
+//    panitia yang sudah masuk. Itulah yang menjaga ujian tetap serentak.
 //  - Catatan privasi: email peserta ikut tersimpan pada dokumen yang boleh
-//    dibaca umum (papan peringkat memerlukan koleksi hasil). Bila email
-//    dianggap sensitif, aktifkan Firebase Auth untuk admin lalu ganti
-//    `allow read: if true;` dengan aturan berbasis email admin — lihat
-//    monev-dak/firestore.rules sebagai contoh.
+//    dibaca umum, karena papan peringkat membaca koleksi hasil. Bila email
+//    dianggap sensitif, ubah `allow read: if true;` pada pretestHasil dan
+//    pretestAkun menjadi `if isAdmin();` — konsekuensinya papan peringkat
+//    hanya bisa dibuka panitia.
 // ═══════════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── sidik jari token admin ──────────────────────────────────────────
-    // Diisi manual dari Firebase Console. Klien tidak boleh membaca maupun
-    // menulisnya; aturan di bawah tetap dapat memakainya lewat get().
-    match /pretestRahasia/{dok} {
-      allow read, write: if false;
+    // ┌───────────────────────────────────────────────────────────────────┐
+    // │ GANTI baris email di bawah dengan email akun panitia Anda.        │
+    // │ Boleh lebih dari satu, pisahkan dengan koma:                      │
+    // │     return ['satu@contoh.go.id', 'dua@contoh.go.id'];             │
+    // └───────────────────────────────────────────────────────────────────┘
+    function emailAdmin() {
+      return [
+        'pfidbidangjalan@gmail.com'
+      ];
     }
 
-    function kunciAdminBenar() {
-      return request.resource.data.kunci is string
-        && request.resource.data.kunci ==
-           get(/databases/$(database)/documents/pretestRahasia/admin).data.hash;
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email in emailAdmin();
     }
 
-    // ── sesi ujian: hanya admin yang boleh mengubah ─────────────────────
+    // ── sesi ujian ──────────────────────────────────────────────────────
+    // Dibaca semua orang (lobi peserta memerlukannya), ditulis hanya panitia.
     match /pretestSesi/{id} {
       allow read: if true;
-      allow write: if kunciAdminBenar();
+      allow write: if isAdmin();
     }
 
     // ── akun peserta ────────────────────────────────────────────────────
-    // Dibuat sendiri oleh peserta saat mendaftar. Boleh diperbarui (mis.
-    // instansi pindah), tetapi tidak boleh dihapus dari aplikasi.
+    // Dibuat sendiri oleh peserta saat mendaftar; boleh diperbarui bila
+    // instansinya berubah. Menghapus hanya boleh oleh panitia.
     match /pretestAkun/{idAkun} {
       allow read: if true;
 
@@ -86,7 +85,7 @@ service cloud.firestore {
         && request.resource.data.instansi.size() >= 3
         && request.resource.data.instansi.size() <= 160;
 
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // ── hasil ujian ─────────────────────────────────────────────────────
@@ -132,8 +131,10 @@ service cloud.firestore {
         && request.resource.data.jawaban is list
         && request.resource.data.jawaban.size() == request.resource.data.total;
 
-      // nilai terkunci begitu terkirim
-      allow update, delete: if false;
+      // nilai terkunci begitu terkirim — panitia pun tidak bisa mengubahnya,
+      // hanya menghapus rekamannya
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     // tutup koleksi lain
