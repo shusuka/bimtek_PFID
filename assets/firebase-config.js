@@ -8,6 +8,12 @@
    untuk tampil di sisi klien. Yang mengamankan data adalah Firestore
    Security Rules (lihat firestore.rules), bukan berkas ini.
 
+   GitHub akan menandainya sebagai "Google API Key" yang bocor — peringatan
+   itu boleh ditutup sebagai false positive. Penjelasan lengkap beserta dua
+   langkah pengetatan yang tetap layak dikerjakan (batasi kunci pada domain
+   sendiri, tutup pendaftaran mandiri di Authentication) ada di README,
+   bagian "Peringatan Secrets detected dari GitHub".
+
    Bila apiKey dikosongkan, atau halaman dibuka lewat file://, aplikasi
    otomatis berjalan dalam MODE LOKAL: data tersimpan di localStorage
    peramban dan pita penanda muncul di kiri bawah halaman.

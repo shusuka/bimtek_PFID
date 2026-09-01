@@ -161,6 +161,35 @@ menghapus rekaman (tombol ✕ pada tabel rekap) dan menulis pengaturan sesi.
 Ingin memakai proyek Firebase sendiri? Ganti isi `assets/firebase-config.js`
 dengan konfigurasi proyek baru, lalu tempel seluruh `firestore.rules` di sana.
 
+### Peringatan "Secrets detected" dari GitHub
+
+GitHub menandai `apiKey` pada `assets/firebase-config.js` sebagai *Google API
+Key* yang bocor. Peringatan itu **wajar dan tidak perlu ditindaklanjuti dengan
+rotasi kunci**: kunci Web API Firebase memang dirancang tampil di sisi klien —
+ia ikut terunduh oleh setiap pengunjung situs, persis seperti alamat proyeknya.
+Ia hanya menunjuk proyek mana yang dituju, bukan memberi izin apa pun. Yang
+menjaga data adalah `firestore.rules` dan akun panitia di Firebase
+Authentication. Alert-nya boleh ditutup dengan alasan *false positive*.
+
+Yang tetap layak dikerjakan, karena kunci itu memang terbuka:
+
+1. **Batasi kunci pada domain sendiri.** Google Cloud Console → APIs & Services
+   → Credentials → kunci "Browser key (auto created by Firebase)" →
+   *Application restrictions* → **HTTP referrers**, lalu daftarkan
+   `bimtek-pfid.vercel.app/*`, `*.vercel.app/*`, dan `localhost/*`. Biarkan
+   *API restrictions* pada "Don't restrict key" supaya Firestore dan Identity
+   Toolkit tetap jalan.
+2. **Tutup pendaftaran mandiri di Authentication.** Penyedia Email/Password
+   yang aktif membuat siapa pun bisa memanggil endpoint pendaftaran dengan
+   kunci itu dan membuat akun di proyek ini. Akun semacam itu tidak mendapat
+   izin apa-apa — `emailAdmin()` hanya mengenali email panitia — tetapi lebih
+   rapi bila ditutup: Google Cloud Console → Identity Platform → **Settings →
+   User actions** → hilangkan centang **Enable create (sign-up)**. Akun panitia
+   tetap bisa ditambah dari Firebase Console.
+
+Yang benar-benar rahasia di proyek ini hanya **kata sandi akun panitia**, dan
+itu tidak pernah tersimpan di repo maupun di berkas mana pun.
+
 ---
 
 ## Bank soal
