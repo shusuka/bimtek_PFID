@@ -50,7 +50,7 @@ service cloud.firestore {
     // └───────────────────────────────────────────────────────────────────┘
     function emailAdmin() {
       return [
-        'pfidbidangjalan@gmail.com'
+        'ranirani@gmail.com'
       ];
     }
 
