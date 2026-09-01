@@ -197,8 +197,9 @@ dipakai menyusun ulang pembahasan dan analisis butir soal.
 
 ## Push ke GitHub
 
+Remote `origin` sudah menunjuk ke <https://github.com/shusuka/bimtek_PFID>:
+
 ```bash
-git remote add origin https://github.com/shusuka/pretest-bimtek.git
 git push -u origin main
 ```
 
@@ -207,7 +208,7 @@ git push -u origin main
 
 ## Deploy ke Vercel
 
-Vercel → **Add New… → Project** → pilih repo `pretest-bimtek` → Framework Preset
+Vercel → **Add New… → Project** → pilih repo `bimtek_PFID` → Framework Preset
 **Other** → Root Directory `./` → Deploy. Tidak ada perintah build dan tidak ada
 variabel lingkungan; `vercel.json` sudah mengatur `cleanUrls` dan tajuk keamanan.
 
