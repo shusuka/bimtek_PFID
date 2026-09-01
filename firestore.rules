@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ATURAN FIRESTORE — koleksi `pretestHasil`
+//
+// DUA CARA MEMASANG
+//
+//  A. Bila memakai proyek Firebase BARU khusus pre-test:
+//     Console → Firestore Database → Rules → hapus isinya → tempel SELURUH
+//     berkas ini → Publish.
+//
+//  B. Bila menumpang proyek emondak-faee8 (bawaan assets/firebase-config.js):
+//     JANGAN menimpa aturan yang sudah ada di sana — aplikasi monev-dak
+//     memakainya. Salin HANYA blok `match /pretestHasil/{id} { … }` di bawah,
+//     lalu tempel di dalam `match /databases/{database}/documents { … }`
+//     TEPAT SEBELUM blok penutup `match /{document=**}`. Publish.
+//     Alamat: https://console.firebase.google.com/u/0/project/emondak-faee8/firestore/rules
+//
+// PRINSIPNYA
+//  - Peserta masuk tanpa akun (tanpa Firebase Auth), jadi dokumen boleh
+//    DIBUAT tanpa login — tetapi isinya diperiksa ketat oleh aturan di bawah.
+//  - Dokumen hanya boleh DIBUAT sekali. Ubah dan hapus ditolak untuk semua
+//    orang; membersihkan data uji coba dilakukan lewat Firebase Console.
+//  - Dokumen boleh DIBACA siapa pun karena papan peringkat memerlukannya.
+//    Catatan privasi: email peserta ikut tersimpan di dokumen yang sama,
+//    jadi email secara teknis ikut terbaca. Bila email dianggap sensitif,
+//    aktifkan Firebase Auth untuk admin lalu ganti `allow read: if true;`
+//    menjadi aturan berbasis email admin (lihat README).
+// ═══════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /pretestHasil/{id} {
+      allow read: if true;
+
+      allow create: if
+           request.resource.data.nama is string
+        && request.resource.data.nama.size() >= 3
+        && request.resource.data.nama.size() <= 120
+
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.emailKunci is string
+        && request.resource.data.emailKunci == request.resource.data.email.lower()
+
+        && request.resource.data.instansi is string
+        && request.resource.data.instansi.size() >= 3
+        && request.resource.data.instansi.size() <= 160
+
+        && request.resource.data.token is string
+        && request.resource.data.token.size() <= 40
+
+        && request.resource.data.total is int
+        && request.resource.data.total > 0
+        && request.resource.data.total <= 30
+        && request.resource.data.benar is int
+        && request.resource.data.benar >= 0
+        && request.resource.data.benar <= request.resource.data.total
+
+        && request.resource.data.skor is int
+        && request.resource.data.skor >= 0
+        && request.resource.data.skor <= 100
+
+        && request.resource.data.durasiDetik is int
+        && request.resource.data.durasiDetik >= 0
+        && request.resource.data.durasiDetik <= 10800
+
+        && request.resource.data.jawaban is list
+        && request.resource.data.jawaban.size() == request.resource.data.total;
+
+      // nilai terkunci begitu terkirim
+      allow update, delete: if false;
+    }
+
+    // tutup koleksi lain (HAPUS blok ini bila aturan ditempel ke proyek
+    // emondak-faee8 — di sana sudah ada penutup yang sama)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
