@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   PRE & POST TEST BIMTEK eMonDAK — gaya tampilan
+   EVALUASI PEMAHAMAN OPERATOR eMonitoring DAK — gaya tampilan
    Tema  : TERANG. Latar langit muda, kartu putih, aksen biru tua dan
            emas yang diambil dari lambang eMonitoring DAK.
    Huruf : Myriad Pro bila terpasang di perangkat; bila tidak, Source
@@ -181,14 +181,34 @@ a:hover { color: var(--kuning); }
 }
 .merek:hover { color: var(--biru); }
 
-/* Lambang dipakai di layar sempit, logo penuh di layar lebar — supaya
-   tulisan "e-Monitoring DAK" pada logo tetap terbaca, tidak dikecilkan
-   sampai kabur. */
-.merek-lambang { width: 46px; height: auto; flex: none; display: block; }
-.merek-logo { height: 68px; width: auto; flex: none; display: none; }
+/* Kop resmi: lambang Kementerian Pekerjaan Umum ditemani dua baris
+   nama unit. Di layar sempit lambangnya berdiri sendiri supaya tulisan
+   tidak dikecilkan sampai kabur. */
+.merek-lambang { width: 44px; height: 44px; flex: none; display: block; }
+.merek-teks {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 12px;
+  border-left: 1px solid var(--garis);
+  line-height: 1.2;
+}
+.merek-teks b {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+}
+.merek-teks i {
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--emas-tua);
+}
 @media (min-width: 620px) {
-  .merek-lambang { display: none; }
-  .merek-logo { display: block; }
+  .merek-teks { display: flex; }
 }
 
 .kuning { color: var(--kuning); }
@@ -305,8 +325,9 @@ a:hover { color: var(--kuning); }
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--garis);
 }
-.kop .merek-logo { height: 50px; }
-.kop .merek-lambang { width: 38px; }
+.kop .merek-lambang { width: 38px; height: 38px; }
+.kop .merek-teks b { font-size: 14px; }
+.kop .merek-teks i { font-size: 10.5px; }
 
 .wadah {
   max-width: 1040px;
@@ -492,6 +513,28 @@ a:hover { color: var(--kuning); }
   counter-increment: n; content: counter(n, decimal-leading-zero);
   position: absolute; left: 20px; top: 16px;
   font-size: 15px; font-weight: 700; color: var(--kuning);
+}
+
+/* Peringatan email aktif + iming-iming voucher tiga besar. Dibedakan
+   dari petunjuk biasa supaya benar-benar terbaca sebelum peserta
+   mengetik alamat emailnya. */
+.catatan-hadiah {
+  display: block;
+  margin-top: 10px;
+  padding: 9px 12px 9px 34px;
+  position: relative;
+  border: 1px solid rgba(217, 154, 18, .38);
+  border-radius: 9px;
+  background: rgba(255, 211, 92, .16);
+  color: #7a5405;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+.catatan-hadiah::before {
+  content: "🎁";
+  position: absolute; left: 11px; top: 9px;
+  font-size: 14px; line-height: 1.55;
 }
 
 .daftar-siap {

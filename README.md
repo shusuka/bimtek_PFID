@@ -1,7 +1,8 @@
-# Pre & Post Test BIMTEK eMonDAK
+# Evaluasi Pemahaman Operator eMonitoring DAK
 
-Situs **pre-test dan post-test** daring untuk peserta Bimbingan Teknis aplikasi
-**eMonitoring DAK**. Temanya terang — langit cerah, kartu putih, aksen biru tua
+Situs **pre-test dan post-test** daring untuk operator daerah aplikasi
+**eMonitoring DAK** — Pusat Fasilitasi Infrastruktur Daerah, Kementerian
+Pekerjaan Umum. Temanya terang — langit cerah, kartu putih, aksen biru tua
 dan emas yang diambil dari lambang eMonitoring DAK — lalu kuis serentak bergaya
 Kahoot: peserta punya akun, menunggu di lobi, dan mengerjakan bersama-sama dalam
 jendela waktu yang dibuka panitia.
@@ -42,13 +43,15 @@ pada jendela waktu yang dibuka panitia.
 | `assets/style.css` | Seluruh gaya tampilan: tema terang, ubin jawaban, animasi |
 | `assets/konfig.js` | Jenis tes, nilai bawaan sesi, dan rumus poin |
 | `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
-| `assets/soal.js` | Bank soal 25 butir dari berkas .docx penyelenggara |
+| `assets/soal.js` | Bank soal 24 butir dari berkas .docx penyelenggara |
 | `assets/data.js` | Lapisan penyimpanan: Firestore atau localStorage |
 | `assets/xlsx.js` | Penulis berkas `.xlsx` untuk rekap Excel (tanpa pustaka luar) |
 | `assets/app.js` | Perute halaman, kuis, papan peringkat, ruang admin |
 | `assets/firebase-config.js` | Kunci proyek Firebase + nama koleksi |
-| `assets/logo-emondak.png` | Logo resmi eMonitoring DAK (dipakai di layar lebar) |
-| `assets/lambang-emondak.png` | Lambangnya saja — favicon, layar sempit, cap air hero |
+| `assets/logo-pu.png` | Logo lengkap Kementerian Pekerjaan Umum (cadangan, lockup penuh) |
+| `assets/lambang-pu.png` | Lambang PU saja — dipakai pada kop bersama nama unit |
+| `assets/logo-emondak.png` | Logo resmi eMonitoring DAK (cadangan) |
+| `assets/lambang-emondak.png` | Lambangnya saja — favicon dan cap air hero |
 | `firestore.rules` | Aturan keamanan Firestore beserta cara memasangnya |
 | `dev-server.mjs` | Peladen statis untuk pratinjau lokal (tidak diunggah ke Vercel) |
 
@@ -252,15 +255,18 @@ itu tidak pernah tersimpan di repo maupun di berkas mana pun.
 
 ## Bank soal
 
-25 butir dari `DAFTAR PERTANYAAN PRE & POST TEST BIMTEK EMONDAK.docx`. Empat
-pasang di antaranya menanyakan hal yang sama dengan redaksi berbeda (ukuran
-foto, format PDF, adendum, format nilai kontrak), jadi tiap pasangan diberi
-penanda `grup` dan pengundian hanya mengambil satu wakil per grup — peserta
-tidak akan menemui soal kembar. Tersisa **21 grup unik**, dan jumlah soal per
-sesi tidak boleh melebihi angka itu.
+24 butir dari `SOAL PRE TEST EMONDAK New.docx` (revisi penyelenggara 2 September
+2026, menggantikan `DAFTAR PERTANYAAN PRE & POST TEST BIMTEK EMONDAK.docx`).
+Tiga pasang di antaranya menanyakan hal yang sama dengan redaksi berbeda (format
+PDF, adendum, format nilai kontrak), jadi tiap pasangan diberi penanda `grup` dan
+pengundian hanya mengambil satu wakil per grup — peserta tidak akan menemui soal
+kembar. Tersisa **21 grup unik**, dan jumlah soal per sesi tidak boleh melebihi
+angka itu.
 
 `id` tiap butir (`p01`…`p25`) **jangan diubah** setelah ada nilai masuk, karena
-dipakai menyusun ulang pembahasan dan analisis butir soal.
+dipakai menyusun ulang pembahasan dan analisis butir soal. `p14` sudah dibuang
+pada revisi ini (kembarannya hilang dari dokumen baru) dan nomornya **tidak
+dipakai ulang** — butir baru harus memakai `p26` dan seterusnya.
 
 ---
 

@@ -8,8 +8,8 @@
    ══════════════════════════════════════════════════════════════════ */
 window.KONFIG = {
   // ── Identitas ─────────────────────────────────────────────────────
-  namaSesi: "Tes BIMTEK eMonDAK",
-  penyelenggara: "Kementerian Pekerjaan Umum",
+  namaSesi: "Evaluasi Pemahaman Operator eMonitoring DAK",
+  penyelenggara: "Pusat Fasilitasi Infrastruktur Daerah, Kementerian Pekerjaan Umum",
   tahun: 2026,
 
   // ── Jenis tes ─────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ window.KONFIG = {
     jenis: "pre",          // "pre" atau "post"
     judul: "Pre-Test BIMTEK eMonDAK Angkatan 1",
     token: "A7K2M9",       // 6 karakter; tombol "Acak" di Ruang Admin membuat yang baru
-    jumlahSoal: 20,        // maksimal 21 (grup soal unik di bank soal)
+    jumlahSoal: 20,        // maksimal 21 (grup soal unik di bank soal 24 butir)
     detikPerSoal: 120,     // hitung mundur tiap butir — 2 menit per soal
     poinCepat: true,       // makin cepat menjawab, makin besar poin
     aktif: false           // dibuka dari Ruang Admin

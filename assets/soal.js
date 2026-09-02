@@ -1,12 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════
-   BANK SOAL — PRE-TEST BIMTEK eMonDAK
-   Sumber : "DAFTAR PERTANYAAN PRE & POST TEST BIMTEK EMONDAK"
-            (berkas .docx dari penyelenggara)
-   Jumlah : 25 butir. Empat pasang di antaranya menanyakan hal yang
+   BANK SOAL — EVALUASI PEMAHAMAN OPERATOR eMonitoring DAK
+   Sumber : "SOAL PRE TEST EMONDAK New.docx" (revisi penyelenggara,
+            2 September 2026) — menggantikan "DAFTAR PERTANYAAN PRE &
+            POST TEST BIMTEK EMONDAK" yang dipakai sebelumnya.
+   Jumlah : 24 butir. Tiga pasang di antaranya menanyakan hal yang
             sama dengan redaksi berbeda, jadi tiap pasangan diberi
             penanda `grup` yang sama; pengundian hanya mengambil SATU
             butir dari tiap grup supaya peserta tidak menemui soal
-            kembar dalam satu sesi.
+            kembar dalam satu sesi — kolam efektifnya 21 grup unik.
    Format : id    = kode tetap, JANGAN diubah setelah ada nilai masuk
                     (dipakai menyusun ulang pembahasan & analisis butir)
             q     = pertanyaan
@@ -18,11 +19,11 @@
 window.SOAL_PRETEST = [
   { id: "p01",
     q: "Bagaimana cara mengakses aplikasi eMonitoring DAK?",
-    o: ["Mengakses halaman website: https://infrastrukturdaerah.pu.go.id/emondak/",
-        "Mengakses halaman website: https://infrastrukturdaerah.pu.go.id/sipdjd/auth",
+    o: ["Mengakses halaman website Portal FID > eMonDAK",
+        "Mengakses halaman website Portal FID > SIPDJD",
         "Mengirimkan formulir permohonan akses data secara fisik setiap kali ingin membuka aplikasi",
-        "Mengunduh aplikasi eMonitoring DAK terlebih dahulu melalui Google Play Store atau App Store"], a: 0,
-    bahas: "eMonDAK berbasis web dan dibuka langsung lewat peramban di alamat infrastrukturdaerah.pu.go.id/emondak/ — tidak ada aplikasi ponsel yang perlu diunduh." },
+        "Mengunduh aplikasi eMonitoring DAK terlebih dahulu melalui Google Play Store atau App Store di smartphone masing-masing"], a: 0,
+    bahas: "eMonDAK dibuka lewat peramban dari Portal FID, menu eMonDAK — bukan SIPDJD, dan tidak ada aplikasi ponsel yang perlu diunduh." },
 
   { id: "p02",
     q: "Dua data (credentials) apa yang wajib diisi pada form Login portal depan eMonDAK?",
@@ -41,7 +42,7 @@ window.SOAL_PRETEST = [
     bahas: "Seluruh tahapan pemilihan penyedia — persiapan, tender, sampai kontrak — dilaporkan pada menu Status PBJ." },
 
   { id: "p04",
-    q: "Pada bagian menu profil, fitur apa yang disarankan untuk rutin diperbarui demi menjaga keamanan akun eMonDAK Anda?",
+    q: "Pada fitur apa Anda disarankan untuk rutin melakukan pembaharuan demi menjaga keamanan akun eMonDAK Anda?",
     o: ["Kata Sandi (Password)",
         "Foto Profil",
         "Alamat Rumah",
@@ -58,7 +59,7 @@ window.SOAL_PRETEST = [
 
   { id: "p06",
     q: "Fitur bantuan apa yang disediakan di dalam aplikasi untuk terhubung langsung dengan pusat jika operator menemui kendala atau error?",
-    o: ["Link/Tombol Helpdesk via WhatsApp",
+    o: ["Tombol (Button) Helpdesk via WhatsApp",
         "Kolom komentar publik",
         "Surat fisik ke kantor",
         "Call center darurat"], a: 0,
@@ -80,20 +81,20 @@ window.SOAL_PRETEST = [
         "Per triwulan, maksimal di akhir bulan"], a: 1,
     bahas: "Pelaporan bersifat bulanan dan ditutup paling lambat 7 hari setelah bulan berkenaan berakhir." },
 
-  { id: "p09", grup: "ukuran-foto",
+  { id: "p09",
     q: "Berapa ukuran maksimal file foto progres yang dapat diunggah ke sistem?",
     o: ["10 MB",
-        "2 MB",
+        "5 MB",
         "20 MB",
         "Tanpa batasan ukuran"], a: 0,
     bahas: "Batas unggah satu berkas foto progres adalah 10 MB; foto yang lebih besar perlu dikompresi lebih dulu." },
 
   { id: "p10",
-    q: "Berapa kali persentase foto progres kegiatan yang wajib diunggah?",
-    o: ["3 kali (0%, 50%, dan 100%)",
-        "1 kali (100% saja)",
-        "2 kali (50% dan 100%)",
-        "4 kali (25%, 50%, 75%, dan 100%)"], a: 0,
+    q: "Berapa persentase foto progres kegiatan yang wajib diunggah?",
+    o: ["0%, 50%, dan 100%",
+        "100% saja",
+        "50% dan 100%",
+        "25%, 50%, 75%, dan 100%"], a: 0,
     bahas: "Dokumentasi wajib diambil dari titik yang sama pada tiga tahap: 0%, 50%, dan 100%." },
 
   { id: "p11", grup: "format-pdf",
@@ -119,14 +120,6 @@ window.SOAL_PRETEST = [
         "Surat Izin Usaha",
         "Foto lokasi baru"], a: 0,
     bahas: "Setiap adendum harus disertai Justifikasi Teknis sebagai dasar perubahan desain atau volume." },
-
-  { id: "p14", grup: "ukuran-foto",
-    q: "Berapa ukuran maksimal file foto progres kegiatan yang diizinkan untuk diunggah ke dalam sistem?",
-    o: ["10 MB",
-        "2 MB",
-        "20 MB",
-        "Tanpa batasan ukuran"], a: 0,
-    bahas: "Batas unggah satu berkas foto progres adalah 10 MB." },
 
   { id: "p15",
     q: "Jika dokumen PDF DED yang akan diunggah ukurannya 30 MB (melebihi batas sistem), apa langkah yang harus dilakukan?",

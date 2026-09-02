@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   PRE-TEST BIMTEK eMonDAK — logika aplikasi
+   EVALUASI PEMAHAMAN OPERATOR eMonitoring DAK — logika aplikasi
 
    Alurnya:
      akun  →  lobi (token sesi + hitung mundur)  →  ujian  →  hasil
@@ -324,10 +324,12 @@
     return `
       <header class="kop">
         <a class="merek" href="#/" title="${aman(judul || 'Beranda')}">
-          <img class="merek-lambang" src="assets/lambang-emondak.png" width="40" height="43"
-               alt="Lambang eMonitoring DAK" />
-          <img class="merek-logo" src="assets/logo-emondak.png" width="447" height="349"
-               alt="eMonitoring DAK" />
+          <img class="merek-lambang" src="assets/lambang-pu.png" width="256" height="256"
+               alt="Lambang Kementerian Pekerjaan Umum" />
+          <span class="merek-teks">
+            <b>Pusat Fasilitasi Infrastruktur Daerah</b>
+            <i>Kementerian Pekerjaan Umum</i>
+          </span>
         </a>
         ${ringkas ? '' : `
         <div class="nav-kanan">
@@ -361,7 +363,8 @@
         </div>
 
         <ol class="langkah" style="margin-top:22px">
-          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun yang sama dipakai lagi pada post-test.</li>
+          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun yang sama dipakai lagi pada post-test.
+            <span class="catatan-hadiah">Pastikan alamat email yang diisi sudah benar dan aktif, karena akan ada voucher menarik bagi 3 besar pemenang.</span></li>
           <li><strong>Tunggu di lobi</strong>Masukkan token sesi yang dibagikan panitia, lalu tunggu sampai seluruh peserta masuk. Token hanya berlaku pada jendela waktu yang dibuka admin.</li>
           <li><strong>Tekan Kerjakan bersama-sama</strong>Sesudah aba-aba panitia, tekan tombol Kerjakan. Ada hitung mundur ${Number(K.detikAbaAba || 5)} detik supaya satu kelas mulai pada detik yang sama.</li>
           <li><strong>Jawab secepat mungkin</strong>Satu layar satu soal dengan hitung mundur sendiri. Jawaban benar bernilai poin, makin cepat makin besar, dan jawaban beruntun dapat bonus. Nilai, pembahasan, serta posisi Anda muncul begitu soal terakhir lewat.</li>
@@ -438,6 +441,7 @@
               <label for="fEmail">Email aktif</label>
               <input id="fEmail" name="email" type="email" autocomplete="email" placeholder="nama@instansi.go.id" required />
               <span class="petunjuk">Penanda peserta — dipakai lagi pada post-test.</span>
+              <span class="catatan-hadiah">Pastikan alamat email yang diisi sudah benar dan aktif, karena akan ada voucher menarik bagi 3 besar pemenang.</span>
             </div>
             <div id="isianBaru" hidden>
               <div class="kolom">
