@@ -19,7 +19,9 @@
 
   const K = window.KONFIG || {};
   const BANK = window.SOAL_PRETEST || [];
-  const VIDEO_HERO = 'https://cdn.sceneai.art/Hero%20section%20video%20file%20(2)/1aafa16f-30a9-48c5-8964-78cffbad914e.mp4';
+  // Latar beranda kini digambar CSS. Isi KONFIG.videoHero bila ingin
+  // memakai video lagi.
+  const VIDEO_HERO = K.videoHero || '';
 
   const $ = (sel, induk) => (induk || document).querySelector(sel);
   const halaman = $('#halaman');
@@ -124,6 +126,12 @@
     return String(m).padStart(2, '0') + ':' + String(d % 60).padStart(2, '0');
   }
 
+  // "120 detik" lebih enak dibaca sebagai "2 menit"
+  function lamaSoal(detik) {
+    const d = Number(detik) || 0;
+    return d >= 60 && d % 60 === 0 ? (d / 60) + ' menit' : d + ' detik';
+  }
+
   function hitungMundurPanjang(ms) {
     const d = Math.max(0, Math.round(ms / 1000));
     const jam = Math.floor(d / 3600);
@@ -194,8 +202,10 @@
 
   (function nyalakanVideo() {
     const v = $('.hero-video');
-    if (!v) return;
+    if (!v || !VIDEO_HERO) return;   // tanpa alamat video, latar CSS yang dipakai
+    v.hidden = false;
     v.muted = true;
+    v.autoplay = true;
     v.src = VIDEO_HERO;
     const jalan = () => v.play().catch(() => {});
     jalan();
@@ -203,6 +213,15 @@
     window.addEventListener('load', jalan);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) jalan(); });
   })();
+
+  /* ── Jenis tes: pre-test dan post-test memakai bank soal yang sama ─ */
+
+  const JENIS = K.jenisTes || {
+    pre:  { label: 'Pre-Test',  panjang: 'Pre-Test',  ket: '' },
+    post: { label: 'Post-Test', panjang: 'Post-Test', ket: '' }
+  };
+  const jenisSah = (j) => (j === 'post' ? 'post' : 'pre');
+  const infoJenis = (j) => JENIS[jenisSah(j)] || JENIS.pre;
 
   /* ── 3. Keadaan aplikasi ─────────────────────────────────────── */
 
@@ -269,6 +288,7 @@
     '#/cara': halamanCara,
     '#/akun': halamanAkun,
     '#/lobi': halamanLobi,
+    '#/siap': halamanSiap,
     '#/tes': halamanTes,
     '#/hasil': halamanHasil,
     '#/peringkat': halamanPeringkat,
@@ -303,11 +323,11 @@
   function kop(judul, ringkas) {
     return `
       <header class="kop">
-        <a class="merek" href="#/">
-          <span class="merek-teks">
-            <strong>eMon<span class="kuning">DAK</span></strong>
-            <small>${aman(judul || 'Pre-Test BIMTEK')}</small>
-          </span>
+        <a class="merek" href="#/" title="${aman(judul || 'Beranda')}">
+          <img class="merek-lambang" src="assets/lambang-emondak.png" width="40" height="43"
+               alt="Lambang eMonitoring DAK" />
+          <img class="merek-logo" src="assets/logo-emondak.png" width="447" height="349"
+               alt="eMonitoring DAK" />
         </a>
         ${ringkas ? '' : `
         <div class="nav-kanan">
@@ -330,22 +350,63 @@
         <div class="label-sudut">Panduan Peserta</div>
         <h1 class="judul-halaman">Empat langkah, <em>dikerjakan serentak</em></h1>
         <p class="ket-halaman">
-          Pre-test ini mengukur pemahaman awal Anda tentang aplikasi eMonitoring DAK
-          sebelum materi bimtek dimulai. Tidak ada nilai minimal kelulusan — hasilnya
-          dipakai penyelenggara untuk menakar titik berat pembahasan di kelas.
+          Tes ini mengukur pemahaman Anda tentang aplikasi eMonitoring DAK. Ada dua kali
+          pengambilan dengan bank soal yang sama — <b>pre-test</b> sebelum materi bimtek dan
+          <b>post-test</b> sesudahnya — supaya perubahan pemahaman satu kelas terlihat.
+          Tidak ada nilai minimal kelulusan.
         </p>
-        <ol class="langkah">
-          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun itu dipakai lagi pada post-test nanti.</li>
-          <li><strong>Tunggu di lobi</strong>Masukkan token sesi yang dibagikan panitia. Token hanya berlaku pada jendela waktu yang dibuka admin, jadi seluruh kelas mulai bersama-sama.</li>
-          <li><strong>Jawab secepat mungkin</strong>Satu layar satu soal dengan hitung mundur. Jawaban benar bernilai poin, dan makin cepat menjawab makin besar poinnya — jawaban beruntun dapat bonus.</li>
-          <li><strong>Lihat papan juara</strong>Nilai, poin, pembahasan, dan posisi Anda muncul begitu soal terakhir lewat. Tiga besar naik podium.</li>
+
+        <div id="aturanSesi" class="kartu kartu-aturan">
+          <div class="kosong">Memuat aturan sesi…</div>
+        </div>
+
+        <ol class="langkah" style="margin-top:22px">
+          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun yang sama dipakai lagi pada post-test.</li>
+          <li><strong>Tunggu di lobi</strong>Masukkan token sesi yang dibagikan panitia, lalu tunggu sampai seluruh peserta masuk. Token hanya berlaku pada jendela waktu yang dibuka admin.</li>
+          <li><strong>Tekan Kerjakan bersama-sama</strong>Sesudah aba-aba panitia, tekan tombol Kerjakan. Ada hitung mundur ${Number(K.detikAbaAba || 5)} detik supaya satu kelas mulai pada detik yang sama.</li>
+          <li><strong>Jawab secepat mungkin</strong>Satu layar satu soal dengan hitung mundur sendiri. Jawaban benar bernilai poin, makin cepat makin besar, dan jawaban beruntun dapat bonus. Nilai, pembahasan, serta posisi Anda muncul begitu soal terakhir lewat.</li>
         </ol>
+
         <p class="ket-halaman" style="margin-top:22px">
-          Satu email hanya dapat mengerjakan <b>satu kali per sesi</b>. Bila terjadi kendala,
+          Satu email hanya dapat mengerjakan <b>satu kali per sesi untuk tiap jenis tes</b> —
+          sudah ikut pre-test tidak menghalangi Anda ikut post-test. Bila terjadi kendala,
           hubungi panitia lewat halaman <a href="#/bantuan">Bantuan</a>.
         </p>
         <a class="btn btn-kuning" href="#/akun">${akun ? 'Lanjut ke lobi' : 'Buat akun sekarang'}</a>
       </div>`;
+
+    // Aturan yang ditampilkan diambil dari sesi yang sedang disiapkan panitia,
+    // jadi angkanya selalu sama dengan yang nanti benar-benar dikerjakan.
+    window.DB.ambilSesi()
+      .then(dok => gambarAturanSesi(dok || K.sesiBawaan || {}))
+      .catch(() => gambarAturanSesi(K.sesiBawaan || {}));
+  }
+
+  function gambarAturanSesi(s) {
+    const kotak = $('#aturanSesi');
+    if (!kotak) return;
+    const jumlah = Number(s.jumlahSoal) || 20;
+    const detik = Number(s.detikPerSoal) || 30;
+    const info = infoJenis(s.jenis);
+    const perSoal = lamaSoal(detik);
+    const total = jumlah * detik;
+
+    kotak.innerHTML = `
+      <div class="label-sudut" style="margin:0 0 10px">Aturan Pengerjaan</div>
+      <p class="ket-halaman" style="margin:0 0 16px">
+        Sesi yang sedang disiapkan panitia: <b>${aman(info.panjang)}</b>${
+          s.judul ? ' — ' + aman(s.judul) : ''}. ${aman(info.ket || '')}
+      </p>
+      <div class="grid-statistik" style="margin:0">
+        <div class="statistik sorot"><div class="angka">${jumlah}</div><div class="nama">Jumlah soal</div></div>
+        <div class="statistik"><div class="angka">${perSoal}</div><div class="nama">Waktu per soal</div></div>
+        <div class="statistik"><div class="angka">${mmss(total)}</div><div class="nama">Total maksimal</div></div>
+      </div>
+      <p class="ket-halaman" style="margin:16px 0 0">
+        Setiap soal punya hitung mundurnya sendiri selama <b>${aman(perSoal)}</b>. Begitu waktu satu
+        soal habis, layar berpindah sendiri ke soal berikutnya dan soal itu dihitung tidak dijawab —
+        jadi seluruh ${jumlah} soal selesai paling lama ${mmss(total)}.
+      </p>`;
   }
 
   /* ── 5b. Akun peserta ────────────────────────────────────────── */
@@ -513,7 +574,7 @@
     const st = statusSesi(sesi);
 
     const tanda = st.keadaan + '|' + JSON.stringify(sesi ? [
-      sesi.judul, sesi.token, sesi.jumlahSoal, sesi.detikPerSoal,
+      sesi.judul, sesi.jenis, sesi.token, sesi.jumlahSoal, sesi.detikPerSoal,
       sesi.mulai, sesi.selesai, sesi.aktif
     ] : null);
 
@@ -527,9 +588,10 @@
     lobiTergambar = tanda;
 
     const kepala = sesi ? `
+      <div class="lencana-jenis ${jenisSah(sesi.jenis)}">${aman(infoJenis(sesi.jenis).label)}</div>
       <div class="sesi-judul">${aman(sesi.judul || K.namaSesi)}</div>
       <div class="sesi-rinci">
-        ${sesi.jumlahSoal || 20} soal · ${sesi.detikPerSoal || 30} detik per soal
+        ${sesi.jumlahSoal || 20} soal · ${lamaSoal(sesi.detikPerSoal || 30)} per soal
         ${sesi.mulai ? ' · mulai ' + aman(tanggalIndo(sesi.mulai)) : ''}
       </div>` : '';
 
@@ -583,8 +645,9 @@
       }
       kotakPesan.innerHTML = '';
       try {
-        if (await window.DB.emailSudahIkut(akun.email, sesi.kode)) {
-          kotakPesan.innerHTML = '<div class="pesan pesan-galat">Akun ini sudah mengerjakan sesi tersebut. ' +
+        if (await window.DB.emailSudahIkut(akun.email, sesi.kode, sesi.jenis)) {
+          kotakPesan.innerHTML = '<div class="pesan pesan-galat">Akun ini sudah mengerjakan ' +
+            aman(infoJenis(sesi.jenis).label) + ' pada sesi tersebut. ' +
             'Lihat posisi Anda di <a href="#/peringkat">papan peringkat</a>.</div>';
           return;
         }
@@ -594,6 +657,8 @@
         akun,
         sesiKode: sesi.kode || 'sesi',
         sesiJudul: sesi.judul || K.namaSesi,
+        sesiToken: sesi.token || '',
+        jenisTes: jenisSah(sesi.jenis),
         detikPerSoal: sesi.detikPerSoal || 30,
         poinCepat: sesi.poinCepat !== false,
         batasSesi: sesi.selesai || null,
@@ -603,19 +668,96 @@
         poin: 0,
         beruntun: 0,
         beruntunMaks: 0,
-        mulai: Date.now(),
-        mulaiSoal: Date.now()
+        dimulai: false,       // baru true sesudah hitung mundur aba-aba
+        mulai: null,
+        mulaiSoal: null
       };
       hasil = null; simpanHasilSesi();
       simpanMain();
-      ke('#/tes');
+      ke('#/siap');
     };
+  }
+
+  /* ── 5c-2. Persiapan & aba-aba ───────────────────────────────────
+     Peserta yang tokennya diterima berhenti di layar ini sampai panitia
+     memberi aba-aba. Menekan "Kerjakan" memulai hitung mundur pendek
+     supaya seisi kelas membuka soal pertama pada detik yang sama. */
+
+  function halamanSiap() {
+    if (!main) { ke(akun ? '#/lobi' : '#/akun'); return; }
+    if (main.dimulai) { ke('#/tes'); return; }
+
+    const jumlah = main.butir.length;
+    const perSoal = lamaSoal(main.detikPerSoal || 30);
+    const info = infoJenis(main.jenisTes);
+
+    halaman.innerHTML = kop('Persiapan', true) + `
+      <div class="wadah wadah-sempit">
+        <div class="label-sudut">Bersiap</div>
+        <h1 class="judul-halaman">Siap, <em>${aman(main.akun.nama.split(' ')[0])}</em>?</h1>
+        <div class="kartu kartu-siap">
+          <div class="lencana-jenis ${jenisSah(main.jenisTes)}">${aman(info.label)}</div>
+          <div class="sesi-judul">${aman(main.sesiJudul || K.namaSesi)}</div>
+          <div class="grid-statistik">
+            <div class="statistik sorot"><div class="angka">${jumlah}</div><div class="nama">Soal</div></div>
+            <div class="statistik"><div class="angka">${perSoal}</div><div class="nama">Waktu per soal</div></div>
+            <div class="statistik"><div class="angka">${mmss(jumlah * (main.detikPerSoal || 30))}</div><div class="nama">Total maksimal</div></div>
+          </div>
+          <ul class="daftar-siap">
+            <li>Satu layar satu soal — jawaban tidak bisa diubah setelah dipilih.</li>
+            <li>Makin cepat menjawab benar, makin besar poinnya.</li>
+            <li>Jangan tutup halaman; bila tertutup, buka lagi alamat yang sama.</li>
+          </ul>
+          <p class="ket-halaman" style="margin:0 0 18px">
+            Tunggu aba-aba panitia, lalu tekan tombol di bawah bersama-sama.
+          </p>
+          <button class="btn btn-kuning btn-blok btn-besar" id="btnKerjakan">Kerjakan</button>
+        </div>
+      </div>
+      <div id="abaAba" class="aba-aba" hidden></div>`;
+
+    $('#btnKerjakan').onclick = () => {
+      $('#btnKerjakan').disabled = true;
+      jalankanAbaAba();
+    };
+  }
+
+  function jalankanAbaAba() {
+    const layar = $('#abaAba');
+    const total = Math.max(1, Number(K.detikAbaAba) || 5);
+    let sisa = total;
+
+    const gambar = () => {
+      layar.hidden = false;
+      layar.innerHTML = sisa > 0
+        ? `<div class="aba-angka" key="${sisa}">${sisa}</div>
+           <div class="aba-teks">Bersiap…</div>`
+        : `<div class="aba-go">GO!</div>`;
+      Suara.tik();
+    };
+
+    gambar();
+    if (jamId) { clearInterval(jamId); jamId = null; }
+    jamId = setInterval(() => {
+      sisa -= 1;
+      if (sisa < 0) {
+        clearInterval(jamId); jamId = null;
+        main.dimulai = true;
+        main.mulai = Date.now();
+        main.mulaiSoal = Date.now();
+        simpanMain();
+        ke('#/tes');
+        return;
+      }
+      gambar();
+    }, 1000);
   }
 
   /* ── 5d. Ujian ala Kahoot ────────────────────────────────────── */
 
   function halamanTes() {
     if (!main) { ke(akun ? '#/lobi' : '#/akun'); return; }
+    if (!main.dimulai) { ke('#/siap'); return; }
 
     halaman.innerHTML = kop('Ruang Ujian', true) + `
       <div class="wadah">
@@ -806,14 +948,18 @@
   async function selesaikan(sebab) {
     if (jamId) { clearInterval(jamId); jamId = null; }
 
-    const rincian = main.butir.map(b => {
+    // "detik" = lama peserta memikirkan butir itu; null bila soal tidak
+    // sempat tampil karena jendela sesi keburu ditutup panitia.
+    const rincian = main.butir.map((b, n) => {
       const j = main.jawaban[b.id];
       return {
         id: b.id,
+        urut: n + 1,
         pilih: j ? j.pilih : -1,
         benar: j ? !!j.benar : false,
         poin: j ? j.poin : 0,
-        detik: j ? j.detik : null
+        detik: j ? j.detik : null,
+        habisWaktu: j ? j.pilih === -1 : false
       };
     });
     const benar = rincian.filter(r => r.benar).length;
@@ -829,12 +975,14 @@
       jabatan: a.jabatan || '',
       sesiKode: main.sesiKode,
       sesiJudul: main.sesiJudul,
+      sesiToken: main.sesiToken || '',
+      jenisTes: jenisSah(main.jenisTes),
       tahun: K.tahun || new Date().getFullYear(),
       skor: Math.round((benar / total) * 100),
       poin: main.poin,
       benar, total,
       beruntunMaks: main.beruntunMaks,
-      durasiDetik: Math.round((Date.now() - main.mulai) / 1000),
+      durasiDetik: main.mulai ? Math.round((Date.now() - main.mulai) / 1000) : 0,
       sebabSelesai: sebab,
       waktuSelesai: new Date().toISOString(),
       jawaban: rincian
@@ -857,11 +1005,16 @@
     const h = hasil;
     const salah = h.total - h.benar;
 
-    halaman.innerHTML = kop('Hasil Pre-Test') + `
+    const infoH = infoJenis(h.jenisTes);
+
+    halaman.innerHTML = kop('Hasil ' + infoH.label) + `
       <div class="wadah">
         <div class="label-sudut">Lembar Jawaban Terkirim</div>
         <h1 class="judul-halaman">Kerja bagus, <em>${aman(h.nama.split(' ')[0])}</em></h1>
-        <p class="ket-halaman">${aman(h.instansi)} · ${aman(h.sesiJudul || '')} · ${aman(tanggalIndo(h.waktuSelesai))}</p>
+        <p class="ket-halaman">
+          <span class="lencana-jenis kecil ${jenisSah(h.jenisTes)}">${aman(infoH.label)}</span>
+          ${aman(h.instansi)} · ${aman(h.sesiJudul || '')} · ${aman(tanggalIndo(h.waktuSelesai))}
+        </p>
 
         ${h.sebabSelesai === 'waktu-sesi' ? '<div class="pesan pesan-info" style="margin-bottom:18px">Jendela waktu sesi berakhir — lembar jawaban dikumpulkan otomatis.</div>' : ''}
         ${h.tersimpan ? '' : '<div class="pesan pesan-galat" style="margin-bottom:18px">Nilai Anda gagal dikirim ke server (jaringan bermasalah). Tunjukkan layar ini ke panitia sebelum menutup halaman.</div>'}
@@ -882,23 +1035,68 @@
           </div>
         </div>
 
+        <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Waktu penyelesaian tiap soal</h2>
+        <p class="ket-halaman">Lama Anda memikirkan tiap butir, dari soal pertama sampai terakhir.</p>
+        ${tabelWaktuPeserta(h)}
+
         <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 14px">Pembahasan</h2>
         <div class="bahasan">
           ${h.jawaban.map((r, n) => {
             const s = soalDari(r.id);
             if (!s) return '';
             const jawabTeks = r.pilih >= 0 ? s.o[r.pilih] : 'Tidak dijawab / waktu habis';
+            const waktu = r.detik != null ? ` · ${r.detik} detik` : '';
             return `
               <div class="butir${r.benar ? ' tepat' : ''}">
                 <div class="tanya">${n + 1}. ${aman(s.q)}</div>
                 <div class="baris kunci">Kunci: <b>${aman(s.o[s.a])}</b></div>
                 ${r.benar
-                  ? `<div class="baris">Poin: <b>+${angkaRapi(r.poin)}</b>${r.detik != null ? ` · dijawab dalam ${r.detik} detik` : ''}</div>`
-                  : `<div class="baris jawab-salah">Jawaban Anda: <b>${aman(jawabTeks)}</b></div>`}
+                  ? `<div class="baris">Poin: <b>+${angkaRapi(r.poin)}</b>${waktu}</div>`
+                  : `<div class="baris jawab-salah">Jawaban Anda: <b>${aman(jawabTeks)}</b>${waktu}</div>`}
                 <div class="catatan">${aman(s.bahas || '')}</div>
               </div>`;
           }).join('')}
         </div>
+      </div>`;
+  }
+
+  /* Rekap waktu tiap butir untuk satu peserta. Batang di kolom terakhir
+     dibandingkan terhadap butir yang paling lama dikerjakan, jadi butir
+     yang bikin tersendat langsung kelihatan. */
+  function tabelWaktuPeserta(h) {
+    const daftar = h.jawaban || [];
+    const terpakai = daftar.filter(r => r.detik != null).map(r => r.detik);
+    if (!terpakai.length) return '<div class="kartu"><div class="kosong">Tidak ada soal yang sempat dikerjakan.</div></div>';
+    const maks = Math.max(...terpakai, 1);
+    const jumlah = terpakai.reduce((t, d) => t + d, 0);
+    const rata = Math.round(jumlah / terpakai.length);
+
+    return `
+      <div class="tabel-bungkus">
+        <table class="tabel">
+          <thead><tr><th>#</th><th>Kode</th><th>Pertanyaan</th><th class="angka">Waktu</th><th>Hasil</th><th class="lebar">Perbandingan</th></tr></thead>
+          <tbody>
+            ${daftar.map((r, n) => {
+              const s = soalDari(r.id);
+              const d = r.detik;
+              return `
+                <tr>
+                  <td class="peringkat-nomor">${n + 1}</td>
+                  <td>${aman(r.id)}</td>
+                  <td class="bebas">${aman(s ? s.q : '—')}</td>
+                  <td class="angka">${d == null ? '—' : d + ' dtk'}</td>
+                  <td>${r.benar
+                    ? '<span class="tanda benar">Benar</span>'
+                    : (r.pilih < 0 ? '<span class="tanda habis">Waktu habis</span>' : '<span class="tanda salah">Salah</span>')}</td>
+                  <td><span class="batang"><i style="width:${d == null ? 0 : Math.round((d / maks) * 100)}%" class="${r.benar ? 'ok' : 'no'}"></i></span></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3">Rata-rata per soal · total waktu kerja</td>
+                <td class="angka">${rata} dtk</td><td colspan="2">${mmss(h.durasiDetik)}</td></tr>
+          </tfoot>
+        </table>
       </div>`;
   }
 
@@ -942,7 +1140,7 @@
     halaman.innerHTML = kop('Papan Peringkat') + `
       <div class="wadah">
         <div class="label-sudut">Papan Peringkat</div>
-        <h1 class="judul-halaman">Juara <em>pre-test</em> ${aman(String(K.tahun || ''))}</h1>
+        <h1 class="judul-halaman">Papan <em>juara</em> ${aman(String(K.tahun || ''))}</h1>
         <p class="ket-halaman">Urutan disusun dari poin tertinggi — jawaban benar yang cepat dan beruntun naik lebih tinggi.</p>
         <div id="isiPeringkat" class="kosong">Memuat data…</div>
       </div>`;
@@ -957,15 +1155,25 @@
     // Yang ditampilkan hanya sesi yang sedang berjalan, supaya nilai angkatan
     // lama tidak bercampur dengan angkatan yang sedang diuji.
     let kodeSesi = null;
+    let jenisSesi = null;
     window.DB.ambilSesi()
-      .then(dok => { sesi = dok; kodeSesi = dok && dok.kode ? dok.kode : null; gambar(); })
+      .then(dok => {
+        sesi = dok;
+        kodeSesi = dok && dok.kode ? dok.kode : null;
+        jenisSesi = dok ? jenisSah(dok.jenis) : null;
+        gambar();
+      })
       .catch(() => gambar());
 
     let terakhir = null;
     const gambar = () => {
       const kotak = $('#isiPeringkat');
       if (!kotak || !terakhir) return;
-      const saring = kodeSesi ? terakhir.filter(p => p.sesiKode === kodeSesi) : terakhir;
+      // Pre-test dan post-test punya papan sendiri walaupun kode sesinya sama.
+      const saring = kodeSesi
+        ? terakhir.filter(p => p.sesiKode === kodeSesi &&
+            (!jenisSesi || jenisSah(p.jenisTes) === jenisSesi))
+        : terakhir;
       kotak.innerHTML = isiPapan(urutkan(saring), sesi);
     };
 
@@ -974,7 +1182,11 @@
 
   function isiPapan(daftar, sesiIni) {
     const judulSesi = sesiIni && sesiIni.judul
-      ? `<p class="ket-halaman" style="margin:-14px 0 20px">Sesi: <b style="color:#fff">${aman(sesiIni.judul)}</b></p>`
+      ? `<p class="ket-halaman" style="margin:-14px 0 20px">
+           <span class="lencana-jenis kecil ${jenisSah(sesiIni.jenis)}">${aman(infoJenis(sesiIni.jenis).label)}</span>
+           Sesi: <b class="tegas">${aman(sesiIni.judul)}</b>
+           ${sesiIni.token ? ' · token <b class="tegas">' + aman(sesiIni.token) + '</b>' : ''}
+         </p>`
       : '';
     if (!daftar.length) {
       return judulSesi + '<div class="kartu"><div class="kosong">Belum ada peserta yang menyelesaikan ujian.</div></div>';
@@ -1089,7 +1301,8 @@
             </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-kuning" id="btnUnduh">Unduh CSV</button>
+            <button class="btn btn-kuning" id="btnUnduhXlsx">Unduh Excel</button>
+            <button class="btn btn-hantu" id="btnUnduh">Unduh CSV</button>
             <button class="btn btn-hantu" id="btnKeluarAdmin">Keluar</button>
           </div>
         </div>
@@ -1100,6 +1313,24 @@
         <h2 class="judul-halaman" style="font-size:20px;margin:32px 0 6px">Pemantauan langsung</h2>
         <p class="ket-halaman">Angka di bawah ikut berubah sendiri saat peserta mengumpulkan jawaban.</p>
         <div id="isiAdmin" class="kosong">Memuat data…</div>
+
+        <h2 class="judul-halaman" style="font-size:20px;margin:38px 0 6px">Pembersihan data</h2>
+        <p class="ket-halaman">
+          Dipakai saat menyiapkan angkatan berikutnya. Semua tindakan di bawah
+          <b>tidak bisa dibatalkan</b>.
+        </p>
+        <div class="kartu kartu-bahaya" id="kartuBahaya">
+          <div class="baris-tombol">
+            <button class="btn btn-bahaya" id="btnHapusAkun">Hapus semua akun peserta</button>
+            <button class="btn btn-hantu" id="btnHapusHasilSesi">Hapus hasil sesi ini</button>
+            <button class="btn btn-hantu" id="btnHapusHasilSemua">Hapus seluruh riwayat hasil</button>
+          </div>
+          <p class="ket-halaman" style="margin:14px 0 0">
+            Menghapus akun tidak menghapus nilai yang sudah masuk, dan sebaliknya.
+            Peserta yang akunnya dihapus cukup mendaftar ulang dengan email yang sama.
+          </p>
+          <div id="pesanBahaya"></div>
+        </div>
       </div>`;
 
     $('#btnKeluarAdmin').onclick = () => {
@@ -1115,6 +1346,11 @@
       gambarKendaliSesi();
     });
 
+    // Penunjuk lama sesi berdenyut sendiri tiap detik. Hanya isi teksnya yang
+    // ditulis ulang, jadi ketikan admin di formulir sesi tidak ikut hilang.
+    if (jamId) clearInterval(jamId);
+    jamId = setInterval(perbaruiJamSesi, 1000);
+
     // ── pemantauan hasil ──
     let daftarKini = [];
     const lepasHasil = window.DB.pantauHasil((daftar) => {
@@ -1124,13 +1360,103 @@
     const lepasSesi = lepasPantau;
     lepasPantau = () => { lepasSesi(); lepasHasil(); };
 
-    $('#btnUnduh').onclick = () => unduhCsv(daftarKini);
+    $('#btnUnduh').onclick = () => unduhCsv(saringTampil(daftarKini));
+    $('#btnUnduhXlsx').onclick = () => unduhExcel(daftarKini);
+
+    pasangTombolBahaya(() => daftarKini);
+  }
+
+  /* ── tombol pembersihan data ─────────────────────────────────────
+     Sengaja meminta pengetikan ulang kata kunci, bukan sekadar OK,
+     karena satu klik keliru menghapus seluruh daftar peserta. */
+
+  function pasangTombolBahaya(ambilDaftar) {
+    const pesan = $('#pesanBahaya');
+    if (!pesan) return;
+
+    const kerjakan = async (tombol, kataKunci, tanya, aksi, sesudah) => {
+      if (!confirm(tanya)) return;
+      const ketik = prompt('Ketik ' + kataKunci + ' untuk memastikan:');
+      if (String(ketik || '').trim().toUpperCase() !== kataKunci) {
+        pesan.innerHTML = '<div class="pesan pesan-info">Dibatalkan — kata kunci tidak cocok.</div>';
+        return;
+      }
+      const teksAsli = tombol.textContent;
+      tombol.disabled = true; tombol.textContent = 'Menghapus…';
+      try {
+        const n = await aksi();
+        pesan.innerHTML = '<div class="pesan pesan-info">' + aman(sesudah(n)) + '</div>';
+      } catch (e) {
+        console.error('[admin] gagal menghapus:', e);
+        pesan.innerHTML = '<div class="pesan pesan-galat">Gagal menghapus: ' + aman(e.code || e.message) +
+          '<br>Bila pesannya soal izin, pastikan email panitia ini terdaftar pada <b>emailAdmin()</b> ' +
+          'di firestore.rules dan aturan terbaru sudah dipublikasikan.</div>';
+      }
+      tombol.disabled = false; tombol.textContent = teksAsli;
+    };
+
+    const tAkun = $('#btnHapusAkun');
+    if (tAkun) tAkun.onclick = () => kerjakan(tAkun, 'HAPUS',
+      'Hapus SELURUH akun peserta yang pernah mendaftar?\n' +
+      'Nilai yang sudah masuk tidak ikut terhapus.',
+      () => window.DB.hapusSemuaAkun(),
+      n => n + ' akun peserta terhapus.');
+
+    const tSesi = $('#btnHapusHasilSesi');
+    if (tSesi) tSesi.onclick = () => {
+      const kode = (sesi && sesi.kode) || '';
+      if (!kode) { pesan.innerHTML = '<div class="pesan pesan-galat">Belum ada kode sesi yang aktif.</div>'; return; }
+      kerjakan(tSesi, 'HAPUS',
+        'Hapus seluruh hasil pada sesi "' + kode + '"?',
+        () => window.DB.hapusSemuaHasil(kode),
+        n => n + ' rekaman nilai sesi ' + kode + ' terhapus.');
+    };
+
+    const tSemua = $('#btnHapusHasilSemua');
+    if (tSemua) tSemua.onclick = () => kerjakan(tSemua, 'HAPUS SEMUA',
+      'Hapus SELURUH riwayat hasil dari semua sesi dan semua angkatan?',
+      () => window.DB.hapusSemuaHasil(null),
+      n => n + ' rekaman nilai terhapus.');
+  }
+
+  /* Penunjuk "sesi sudah berjalan berapa lama" di kepala kartu sesi. */
+  function perbaruiJamSesi() {
+    const el = $('#jamSesiAdmin');
+    if (!el || !sesi) return;
+    const st = statusSesi(sesi);
+    if (st.keadaan === 'buka' && st.mulai) {
+      const berjalan = hitungMundurPanjang(Date.now() - st.mulai);
+      el.textContent = st.sisaTutup != null
+        ? `Berjalan ${berjalan} · sisa ${hitungMundurPanjang(st.sisaTutup)}`
+        : `Berjalan ${berjalan}`;
+    } else if (st.keadaan === 'menunggu') {
+      el.textContent = `Mulai dalam ${hitungMundurPanjang(st.sisaMulai)}`;
+    } else if (st.keadaan === 'lewat' && sesi.selesai) {
+      el.textContent = `Berakhir ${tanggalIndo(sesi.selesai)}`;
+    } else {
+      el.textContent = '';
+    }
   }
 
   // Sidik isi sesi yang sedang tergambar. Pemantauan sesi berdenyut tiap
   // beberapa detik; tanpa penjaga ini formulir akan dibangun ulang terus dan
   // menghapus ketikan admin.
   let sesiTergambar = null;
+
+  /* Penyaring tabel pemantauan admin.
+       ''        → hanya sesi yang sedang berjalan (kode di kartu sesi)
+       '*'       → seluruh riwayat, semua angkatan
+       'A7K2M9'  → hanya peserta yang masuk dengan token itu */
+  let saringToken = '';
+
+  const tokenDari = (p) => String(p.sesiToken || '').trim().toUpperCase();
+
+  function saringTampil(daftar) {
+    if (saringToken === '*') return daftar;
+    if (saringToken) return daftar.filter(p => tokenDari(p) === saringToken);
+    const kode = (sesi && sesi.kode) || null;
+    return kode ? daftar.filter(p => p.sesiKode === kode) : daftar;
+  }
 
   function gambarKendaliSesi() {
     const kotak = $('#kartuSesi');
@@ -1150,8 +1476,26 @@
     }[st.keadaan];
 
     kotak.innerHTML = `
-      <div class="lampu ${lampu}"><span></span> ${aman(ket)}</div>
+      <div class="bilah-lampu">
+        <div class="lampu ${lampu}"><span></span> ${aman(ket)}</div>
+        <div class="jam-sesi" id="jamSesiAdmin"></div>
+      </div>
       <form class="formulir kisi-dua" id="formSesi" style="margin-top:18px">
+        <div class="kolom kolom-lebar">
+          <label>Jenis tes</label>
+          <div class="pilih-jenis">
+            ${['pre', 'post'].map(j => `
+              <label class="jenis-opsi ${jenisSah(s.jenis) === j ? 'terpilih' : ''}">
+                <input type="radio" name="sJenis" value="${j}" ${jenisSah(s.jenis) === j ? 'checked' : ''} />
+                <b>${aman(infoJenis(j).label)}</b>
+                <small>${aman(infoJenis(j).ket)}</small>
+              </label>`).join('')}
+          </div>
+          <span class="petunjuk">
+            Bank soalnya sama persis; yang berbeda hanya judul, sebutan di layar, dan pemisahan rekap.
+            Satu peserta boleh mengerjakan pre-test dan post-test walaupun kode sesinya tidak diubah.
+          </span>
+        </div>
         <div class="kolom">
           <label for="sKode">Kode sesi</label>
           <input id="sKode" type="text" value="${aman(s.kode || '')}" placeholder="BIMTEK-01" />
@@ -1184,7 +1528,9 @@
         </div>
         <div class="kolom">
           <label for="sDetik">Detik per soal</label>
-          <input id="sDetik" type="number" min="10" max="120" value="${Number(s.detikPerSoal || 30)}" />
+          <input id="sDetik" type="number" min="10" max="600" value="${Number(s.detikPerSoal || 30)}" />
+          <span class="petunjuk">120 = 2 menit per soal. Total maksimal
+            ${mmss(Number(s.jumlahSoal || 20) * Number(s.detikPerSoal || 30))}.</span>
         </div>
         <div class="kolom kolom-lebar">
           <label class="centang">
@@ -1195,19 +1541,23 @@
         <div class="kolom-lebar baris-tombol">
           <button class="btn btn-biru" type="submit">Simpan pengaturan</button>
           ${st.keadaan === 'buka'
-            ? '<button class="btn btn-hantu" id="btnTutup" type="button">Tutup sesi sekarang</button>'
+            ? '<button class="btn btn-kuning" id="btnAkhiri" type="button">Akhiri sesi sekarang</button>'
             : '<button class="btn btn-kuning" id="btnBuka" type="button">Buka sesi sekarang</button>'}
+          ${st.keadaan !== 'buka' && (s.aktif || st.keadaan === 'menunggu')
+            ? '<button class="btn btn-hantu" id="btnAkhiri2" type="button">Batalkan jadwal</button>'
+            : ''}
         </div>
       </form>`;
 
     const bacaForm = () => ({
       kode: $('#sKode').value.trim() || 'sesi',
+      jenis: (document.querySelector('input[name="sJenis"]:checked') || {}).value === 'post' ? 'post' : 'pre',
       token: $('#sToken').value.trim(),
       judul: $('#sJudul').value.trim(),
       mulai: $('#sMulai').value ? new Date($('#sMulai').value).toISOString() : null,
       selesai: $('#sSelesai').value ? new Date($('#sSelesai').value).toISOString() : null,
       jumlahSoal: Math.min(21, Math.max(5, Number($('#sJumlah').value) || 20)),
-      detikPerSoal: Math.min(120, Math.max(10, Number($('#sDetik').value) || 30)),
+      detikPerSoal: Math.min(600, Math.max(10, Number($('#sDetik').value) || 30)),
       poinCepat: $('#sPoinCepat').checked,
       aktif: !!(sesi && sesi.aktif)
     });
@@ -1231,6 +1581,21 @@
 
     $('#btnAcakToken').onclick = () => { $('#sToken').value = tokenAcak(); };
 
+    // Mengganti jenis tes ikut menyesuaikan judul bawaan, selama judulnya
+    // belum diubah sendiri oleh panitia.
+    for (const radio of kotak.querySelectorAll('input[name="sJenis"]')) {
+      radio.onchange = () => {
+        for (const opsi of kotak.querySelectorAll('.jenis-opsi')) {
+          opsi.classList.toggle('terpilih', opsi.contains(radio) && radio.checked);
+        }
+        const judul = $('#sJudul');
+        const lawan = infoJenis(radio.value === 'post' ? 'pre' : 'post');
+        const kini = infoJenis(radio.value);
+        if (!judul.value.trim()) judul.value = kini.panjang;
+        else if (judul.value.includes(lawan.label)) judul.value = judul.value.replace(lawan.label, kini.label);
+      };
+    }
+
     $('#formSesi').onsubmit = (ev) => { ev.preventDefault(); simpan(); };
     const buka = $('#btnBuka');
     if (buka) buka.onclick = () => {
@@ -1246,49 +1611,84 @@
           : new Date(kini.getTime() + 60 * 60000).toISOString()
       });
     };
-    const tutup = $('#btnTutup');
-    if (tutup) tutup.onclick = () => simpan({ aktif: false, selesai: new Date().toISOString() });
+    // Mengakhiri sesi: pintu ditutup seketika. Peserta yang sedang
+    // mengerjakan tetap dikumpulkan lembar jawabannya oleh jalankanJamSoal(),
+    // tetapi tidak ada peserta baru yang bisa masuk dengan token itu lagi.
+    const akhiri = () => {
+      if (!confirm('Akhiri sesi sekarang?\n' +
+        'Peserta yang belum masuk tidak dapat lagi memakai token ini, dan lembar jawaban ' +
+        'yang sedang dikerjakan langsung dikumpulkan.')) return;
+      simpan({ aktif: false, selesai: new Date().toISOString() });
+    };
+    const tAkhiri = $('#btnAkhiri');
+    if (tAkhiri) tAkhiri.onclick = akhiri;
+    const tAkhiri2 = $('#btnAkhiri2');
+    if (tAkhiri2) tAkhiri2.onclick = () => simpan({ aktif: false });
+
+    perbaruiJamSesi();
   }
+
+  /* Urutan tabel rekap butir: 'lama' = paling menyita waktu di atas,
+     'salah' = paling banyak dijawab keliru di atas. */
+  let urutButir = 'lama';
 
   async function gambarPantauan(daftar) {
     const kotak = $('#isiAdmin');
     if (!kotak) return;
 
     const kode = (sesi && sesi.kode) || null;
-    const sesiIni = kode ? daftar.filter(p => p.sesiKode === kode) : daftar;
+    const tampil = saringTampil(daftar);
+
+    // Daftar token yang pernah dipakai peserta, untuk kotak penyaring.
+    const hitungToken = new Map();
+    for (const p of daftar) {
+      const t = tokenDari(p);
+      if (!t) continue;
+      hitungToken.set(t, (hitungToken.get(t) || 0) + 1);
+    }
+    const pilihanToken = [...hitungToken.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+
     let jumlahAkun = '—';
     try { jumlahAkun = await window.DB.jumlahAkun(); } catch { /* biarkan */ }
 
-    const n = sesiIni.length;
-    const instansi = new Set(sesiIni.map(p => (p.instansi || '').trim().toLowerCase())).size;
-    const rata = n ? Math.round(sesiIni.reduce((t, p) => t + (p.skor || 0), 0) / n) : 0;
-    const rataPoin = n ? Math.round(sesiIni.reduce((t, p) => t + (p.poin || 0), 0) / n) : 0;
-    const tertinggi = n ? Math.max(...sesiIni.map(p => p.skor || 0)) : 0;
-    const terendah = n ? Math.min(...sesiIni.map(p => p.skor || 0)) : 0;
+    const n = tampil.length;
+    const instansi = new Set(tampil.map(p => (p.instansi || '').trim().toLowerCase())).size;
+    const rata = n ? Math.round(tampil.reduce((t, p) => t + (p.skor || 0), 0) / n) : 0;
+    const rataPoin = n ? Math.round(tampil.reduce((t, p) => t + (p.poin || 0), 0) / n) : 0;
+    const rataDurasi = n ? Math.round(tampil.reduce((t, p) => t + (p.durasiDetik || 0), 0) / n) : 0;
+    const tertinggi = n ? Math.max(...tampil.map(p => p.skor || 0)) : 0;
+    const terendah = n ? Math.min(...tampil.map(p => p.skor || 0)) : 0;
 
-    const butir = BANK.map(s => {
-      let muncul = 0, tepat = 0;
-      for (const p of sesiIni) {
-        const r = (p.jawaban || []).find(x => x.id === s.id);
-        if (!r) continue;
-        muncul++;
-        if (r.benar) tepat++;
-      }
-      return { id: s.id, q: s.q, muncul, tepat, persen: muncul ? Math.round((tepat / muncul) * 100) : null };
-    }).filter(b => b.muncul > 0).sort((a, b) => a.persen - b.persen);
+    const judulSaring = saringToken === '*'
+      ? 'seluruh riwayat'
+      : (saringToken ? 'token ' + saringToken : (kode ? 'sesi ' + kode : 'semua'));
 
     kotak.innerHTML = `
+      <div class="baris-saring">
+        <div class="kolom" style="max-width:320px;margin:0">
+          <label for="saringSesi">Tampilkan</label>
+          <select id="saringSesi">
+            <option value=""${saringToken === '' ? ' selected' : ''}>Sesi berjalan${kode ? ' — ' + aman(kode) : ''}</option>
+            <option value="*"${saringToken === '*' ? ' selected' : ''}>Seluruh riwayat (semua angkatan)</option>
+            ${pilihanToken.map(([t, j]) => `
+              <option value="${aman(t)}"${saringToken === t ? ' selected' : ''}>Token ${aman(t)} — ${j} peserta</option>`).join('')}
+          </select>
+          <span class="petunjuk">Rekap Excel selalu memisahkan tiap token menjadi sheet sendiri.</span>
+        </div>
+      </div>
+
       <div class="grid-statistik">
-        <div class="statistik sorot"><div class="angka">${n}</div><div class="nama">Sudah mengisi${kode ? ' (sesi ' + aman(kode) + ')' : ''}</div></div>
+        <div class="statistik sorot"><div class="angka">${n}</div><div class="nama">Sudah mengisi (${aman(judulSaring)})</div></div>
         <div class="statistik"><div class="angka">${jumlahAkun}</div><div class="nama">Akun terdaftar</div></div>
         <div class="statistik"><div class="angka">${instansi}</div><div class="nama">Instansi</div></div>
         <div class="statistik"><div class="angka">${angkaRapi(rataPoin)}</div><div class="nama">Rata-rata poin</div></div>
         <div class="statistik"><div class="angka">${rata}</div><div class="nama">Rata-rata nilai</div></div>
         <div class="statistik"><div class="angka">${tertinggi}</div><div class="nama">Nilai tertinggi</div></div>
         <div class="statistik"><div class="angka">${terendah}</div><div class="nama">Nilai terendah</div></div>
+        <div class="statistik"><div class="angka">${mmss(rataDurasi)}</div><div class="nama">Rata-rata waktu kerja</div></div>
       </div>
 
-      ${n === 0 ? '<div class="kartu" style="margin-top:18px"><div class="kosong">Belum ada peserta yang menyelesaikan ujian pada sesi ini.</div></div>' : `
+      ${n === 0 ? '<div class="kartu" style="margin-top:18px"><div class="kosong">Belum ada peserta yang menyelesaikan ujian pada pilihan ini.</div></div>' : `
       <div class="kolom" style="max-width:340px;margin:22px 0 12px">
         <label for="cari">Cari nama / instansi / email</label>
         <input id="cari" type="search" placeholder="ketik untuk menyaring…" />
@@ -1298,21 +1698,25 @@
         <table class="tabel" id="tabelAdmin">
           <thead>
             <tr><th>#</th><th>Nama</th><th>Email</th><th>Pemda</th><th>Provinsi</th>
+                <th>Jenis</th><th>Token</th>
                 <th class="angka">Poin</th><th class="angka">Nilai</th><th class="angka">Benar</th>
-                <th class="angka">Waktu</th><th>Selesai</th><th></th></tr>
+                <th class="angka">Waktu</th><th class="angka">Rata/soal</th><th>Selesai</th><th></th></tr>
           </thead>
           <tbody>
-            ${sesiIni.map((p, i) => `
+            ${tampil.map((p, i) => `
               <tr data-cari="${aman(((p.nama || '') + ' ' + (p.instansi || '') + ' ' + (p.email || '')).toLowerCase())}">
                 <td class="peringkat-nomor">${i + 1}</td>
                 <td class="bebas">${aman(p.nama)}</td>
                 <td>${aman(p.email)}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
                 <td>${aman(p.provinsi || provinsiDari(p.instansi))}</td>
-                <td class="angka" style="color:var(--kuning);font-weight:700">${angkaRapi(p.poin || 0)}</td>
+                <td><span class="lencana-jenis kecil ${jenisSah(p.jenisTes)}">${aman(infoJenis(p.jenisTes).label)}</span></td>
+                <td class="mono">${aman(tokenDari(p) || '—')}</td>
+                <td class="angka tegas-kuning">${angkaRapi(p.poin || 0)}</td>
                 <td class="angka">${p.skor}</td>
                 <td class="angka">${p.benar}/${p.total}</td>
                 <td class="angka">${mmss(p.durasiDetik)}</td>
+                <td class="angka">${p.total ? Math.round((p.durasiDetik || 0) / p.total) + ' dtk' : '—'}</td>
                 <td>${aman(tanggalIndo(p.waktuSelesai))}</td>
                 <td><button class="tombol-hapus" data-hapus="${aman(p.id)}" data-nama="${aman(p.nama)}"
                         title="Hapus rekaman ini">✕</button></td>
@@ -1321,23 +1725,16 @@
         </table>
       </div>
 
-      <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Analisis butir soal</h2>
-      <p class="ket-halaman">Diurutkan dari yang paling banyak dijawab salah — bahan penekanan materi di kelas.</p>
-      <div class="tabel-bungkus">
-        <table class="tabel">
-          <thead><tr><th>Kode</th><th>Pertanyaan</th><th class="angka">Muncul</th><th class="angka">Benar</th><th class="angka">% Benar</th></tr></thead>
-          <tbody>
-            ${butir.map(b => `
-              <tr>
-                <td>${aman(b.id)}</td>
-                <td class="bebas">${aman(b.q)}</td>
-                <td class="angka">${b.muncul}</td>
-                <td class="angka">${b.tepat}</td>
-                <td class="angka" style="color:${b.persen < 50 ? 'var(--salah)' : 'var(--benar)'}">${b.persen}%</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`}
+      <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Rekap waktu penyelesaian tiap soal</h2>
+      <p class="ket-halaman">
+        Lama peserta memikirkan tiap butir pada ${aman(judulSaring)}. Butir yang menyita waktu paling
+        banyak biasanya butir yang paling perlu diperjelas di kelas.
+      </p>
+      <div class="baris-tombol" style="margin-bottom:12px">
+        <button class="btn btn-kecil ${urutButir === 'lama' ? 'btn-biru' : 'btn-hantu'}" data-urut="lama">Urutkan: paling lama</button>
+        <button class="btn btn-kecil ${urutButir === 'salah' ? 'btn-biru' : 'btn-hantu'}" data-urut="salah">Urutkan: paling banyak salah</button>
+      </div>
+      ${tabelRekapButir(tampil)}`}
 
       ${window.DB.mode === 'lokal'
         ? `<div class="pesan pesan-info" style="margin-top:22px">
@@ -1345,6 +1742,13 @@
              <button class="btn btn-hantu" id="btnBersih" style="margin-left:10px">Bersihkan data lokal</button>
            </div>`
         : ''}`;
+
+    const saring = $('#saringSesi');
+    if (saring) saring.onchange = () => { saringToken = saring.value; gambarPantauan(daftar); };
+
+    for (const t of kotak.querySelectorAll('[data-urut]')) {
+      t.onclick = () => { urutButir = t.dataset.urut; gambarPantauan(daftar); };
+    }
 
     const tabel = $('#tabelAdmin');
     if (tabel) tabel.addEventListener('click', async (ev) => {
@@ -1371,24 +1775,101 @@
     };
     const bersih = $('#btnBersih');
     if (bersih) bersih.onclick = () => {
-      if (confirm('Hapus seluruh data pre-test yang tersimpan di peramban ini?')) {
+      if (confirm('Hapus seluruh data tes yang tersimpan di peramban ini?')) {
         window.DB.kosongkanLokal();
         ke('#/admin');
       }
     };
   }
 
+  /* Hitung, untuk tiap butir yang pernah tampil: berapa kali muncul, berapa
+     yang benar, dan berapa lama peserta memikirkannya. */
+  function rekapButir(daftar) {
+    return BANK.map(s => {
+      let muncul = 0, tepat = 0, habis = 0, jumlah = 0, berwaktu = 0;
+      let tercepat = null, terlama = null;
+      for (const p of daftar) {
+        const r = (p.jawaban || []).find(x => x.id === s.id);
+        if (!r) continue;
+        muncul++;
+        if (r.benar) tepat++;
+        if (r.pilih < 0) habis++;
+        if (r.detik != null) {
+          berwaktu++;
+          jumlah += r.detik;
+          if (tercepat == null || r.detik < tercepat) tercepat = r.detik;
+          if (terlama == null || r.detik > terlama) terlama = r.detik;
+        }
+      }
+      return {
+        id: s.id, q: s.q, muncul, tepat, habis,
+        persen: muncul ? Math.round((tepat / muncul) * 100) : null,
+        rata: berwaktu ? Math.round(jumlah / berwaktu) : null,
+        tercepat, terlama
+      };
+    }).filter(b => b.muncul > 0);
+  }
+
+  function tabelRekapButir(daftar) {
+    const butir = rekapButir(daftar);
+    if (!butir.length) return '<div class="kartu"><div class="kosong">Belum ada butir soal yang dikerjakan.</div></div>';
+
+    butir.sort(urutButir === 'salah'
+      ? (a, b) => (a.persen - b.persen) || ((b.rata || 0) - (a.rata || 0))
+      : (a, b) => ((b.rata || 0) - (a.rata || 0)) || (a.persen - b.persen));
+
+    const maks = Math.max(...butir.map(b => b.rata || 0), 1);
+
+    return `
+      <div class="tabel-bungkus">
+        <table class="tabel">
+          <thead>
+            <tr><th>Kode</th><th>Pertanyaan</th><th class="angka">Muncul</th>
+                <th class="angka">Benar</th><th class="angka">% Benar</th>
+                <th class="angka">Rata-rata</th><th class="angka">Tercepat</th><th class="angka">Terlama</th>
+                <th class="angka">Habis waktu</th><th class="lebar">Perbandingan waktu</th></tr>
+          </thead>
+          <tbody>
+            ${butir.map(b => `
+              <tr>
+                <td>${aman(b.id)}</td>
+                <td class="bebas">${aman(b.q)}</td>
+                <td class="angka">${b.muncul}</td>
+                <td class="angka">${b.tepat}</td>
+                <td class="angka ${b.persen < 50 ? 'buruk' : 'baik'}">${b.persen}%</td>
+                <td class="angka tegas">${b.rata == null ? '—' : b.rata + ' dtk'}</td>
+                <td class="angka">${b.tercepat == null ? '—' : b.tercepat + ' dtk'}</td>
+                <td class="angka">${b.terlama == null ? '—' : b.terlama + ' dtk'}</td>
+                <td class="angka">${b.habis}</td>
+                <td><span class="batang"><i style="width:${Math.round(((b.rata || 0) / maks) * 100)}%" class="${b.persen < 50 ? 'no' : 'ok'}"></i></span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+
+  /* Baris peserta yang dipakai bersama oleh CSV dan Excel. */
+  const KEPALA_PESERTA = [
+    'Peringkat', 'Nama', 'Email', 'Pemda', 'Provinsi', 'Jabatan',
+    'Jenis Tes', 'Kode Sesi', 'Token', 'Judul Sesi',
+    'Poin', 'Nilai', 'Benar', 'Total Soal', 'Beruntun',
+    'Durasi (detik)', 'Durasi', 'Rata-rata per Soal (detik)', 'Waktu Selesai'
+  ];
+
+  const barisPeserta = (p, n) => [
+    n + 1, p.nama, p.email, p.instansi,
+    p.provinsi || provinsiDari(p.instansi), p.jabatan || '',
+    infoJenis(p.jenisTes).label, p.sesiKode || '', tokenDari(p) || '', p.sesiJudul || '',
+    p.poin || 0, p.skor, p.benar, p.total, p.beruntunMaks || 0,
+    p.durasiDetik || 0, mmss(p.durasiDetik),
+    p.total ? Math.round((p.durasiDetik || 0) / p.total) : '',
+    tanggalIndo(p.waktuSelesai)
+  ];
+
   function unduhCsv(daftar) {
-    const baris = [[
-      'Peringkat', 'Nama', 'Email', 'Pemda', 'Provinsi', 'Jabatan', 'Sesi',
-      'Poin', 'Nilai', 'Benar', 'Total', 'Beruntun', 'Durasi (detik)', 'Durasi', 'Waktu Selesai'
-    ]];
-    daftar.forEach((p, n) => baris.push([
-      n + 1, p.nama, p.email, p.instansi,
-      p.provinsi || provinsiDari(p.instansi), p.jabatan || '', p.sesiKode || '',
-      p.poin || 0, p.skor, p.benar, p.total, p.beruntunMaks || 0,
-      p.durasiDetik, mmss(p.durasiDetik), tanggalIndo(p.waktuSelesai)
-    ]));
+    const baris = [KEPALA_PESERTA];
+    daftar.forEach((p, n) => baris.push(barisPeserta(p, n)));
 
     const csv = baris.map(r => r.map(sel => {
       const t = String(sel == null ? '' : sel);
@@ -1400,11 +1881,104 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `rekap-pretest-bimtek-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `rekap-tes-emondak-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /* ── Rekap Excel, dipisah per token ──────────────────────────────
+     Panitia memakai satu token untuk satu kelas/angkatan, jadi tiap
+     token mendapat sheet pesertanya sendiri ditambah sheet rekap waktu
+     per soal. Satu sheet ringkasan di depan menyatukan semuanya. */
+
+  function unduhExcel(daftar) {
+    const semua = urutkan(daftar || []);
+    if (!semua.length) { alert('Belum ada data yang bisa diunduh.'); return; }
+
+    // kelompokkan per token; rekaman lama yang belum menyimpan token
+    // dikumpulkan pada satu kelompok tersendiri
+    const kelompok = new Map();
+    for (const p of semua) {
+      const t = tokenDari(p) || 'TANPA TOKEN';
+      if (!kelompok.has(t)) kelompok.set(t, []);
+      kelompok.get(t).push(p);
+    }
+    const token = [...kelompok.keys()].sort();
+
+    const sheets = [];
+
+    // 1. Ringkasan seluruh token
+    const ringkas = [[
+      'Token', 'Jenis Tes', 'Kode Sesi', 'Judul Sesi', 'Jumlah Peserta', 'Jumlah Instansi',
+      'Rata-rata Poin', 'Rata-rata Nilai', 'Nilai Tertinggi', 'Nilai Terendah',
+      'Rata-rata Waktu Kerja (detik)', 'Rata-rata Waktu per Soal (detik)', 'Selesai Pertama', 'Selesai Terakhir'
+    ]];
+    for (const t of token) {
+      const g = kelompok.get(t);
+      const n = g.length;
+      const jenis = [...new Set(g.map(p => infoJenis(p.jenisTes).label))].join(' + ');
+      const kode = [...new Set(g.map(p => p.sesiKode || ''))].filter(Boolean).join(' + ');
+      const judul = [...new Set(g.map(p => p.sesiJudul || ''))].filter(Boolean).join(' + ');
+      const durasi = g.reduce((a, p) => a + (p.durasiDetik || 0), 0);
+      const butirTotal = g.reduce((a, p) => a + (p.total || 0), 0);
+      const waktu = g.map(p => p.waktuSelesai).filter(Boolean).sort();
+      ringkas.push([
+        t, jenis, kode, judul, n,
+        new Set(g.map(p => (p.instansi || '').trim().toLowerCase())).size,
+        Math.round(g.reduce((a, p) => a + (p.poin || 0), 0) / n),
+        Math.round(g.reduce((a, p) => a + (p.skor || 0), 0) / n),
+        Math.max(...g.map(p => p.skor || 0)),
+        Math.min(...g.map(p => p.skor || 0)),
+        Math.round(durasi / n),
+        butirTotal ? Math.round(durasi / butirTotal) : '',
+        tanggalIndo(waktu[0]), tanggalIndo(waktu[waktu.length - 1])
+      ]);
+    }
+    sheets.push({ nama: 'Ringkasan', baris: ringkas });
+
+    // 2. Per token: daftar peserta + rekap waktu tiap soal
+    for (const t of token) {
+      const g = kelompok.get(t);
+
+      const peserta = [KEPALA_PESERTA];
+      g.forEach((p, n) => peserta.push(barisPeserta(p, n)));
+      sheets.push({ nama: 'Peserta ' + t, baris: peserta });
+
+      const waktu = [[
+        'Kode Soal', 'Pertanyaan', 'Muncul', 'Benar', '% Benar',
+        'Rata-rata (detik)', 'Tercepat (detik)', 'Terlama (detik)', 'Habis Waktu'
+      ]];
+      for (const b of rekapButir(g).sort((x, y) => (y.rata || 0) - (x.rata || 0))) {
+        waktu.push([b.id, b.q, b.muncul, b.tepat, b.persen, b.rata, b.tercepat, b.terlama, b.habis]);
+      }
+      sheets.push({ nama: 'Waktu Soal ' + t, baris: waktu });
+    }
+
+    // 3. Satu sheet panjang: waktu tiap peserta pada tiap soal
+    const rinci = [[
+      'Token', 'Jenis Tes', 'Nama', 'Email', 'Pemda',
+      'Nomor Soal', 'Kode Soal', 'Pertanyaan', 'Jawaban Peserta', 'Kunci', 'Hasil',
+      'Waktu (detik)', 'Poin'
+    ]];
+    for (const p of semua) {
+      (p.jawaban || []).forEach((r, i) => {
+        const s = soalDari(r.id);
+        rinci.push([
+          tokenDari(p) || '', infoJenis(p.jenisTes).label, p.nama, p.email, p.instansi,
+          r.urut || (i + 1), r.id, s ? s.q : '',
+          s && r.pilih >= 0 ? s.o[r.pilih] : (r.pilih < 0 ? '(tidak dijawab)' : ''),
+          s ? s.o[s.a] : '',
+          r.benar ? 'Benar' : (r.pilih < 0 ? 'Habis waktu' : 'Salah'),
+          r.detik == null ? '' : r.detik,
+          r.poin || 0
+        ]);
+      });
+    }
+    sheets.push({ nama: 'Rincian Jawaban', baris: rinci });
+
+    window.XLSX.unduh(`rekap-tes-emondak-${new Date().toISOString().slice(0, 10)}.xlsx`, sheets);
   }
 
   /* ── 5h. Bantuan ─────────────────────────────────────────────── */

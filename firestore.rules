@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ATURAN FIRESTORE — pre-test BIMTEK eMonDAK (proyek bimtek-pfid)
+// ATURAN FIRESTORE — pre-test & post-test BIMTEK eMonDAK (proyek bimtek-pfid)
 //
 // Koleksi yang dipakai
 //   pretestAkun/{idAkun}    profil peserta (nama, email, pemda)
@@ -108,6 +108,15 @@ service cloud.firestore {
 
         && request.resource.data.sesiKode is string
         && request.resource.data.sesiKode.size() <= 40
+
+        // jenis tes ("pre"/"post") dan token sesi — dibiarkan opsional supaya
+        // rekaman lama dari versi sebelumnya tetap sah
+        && (!('jenisTes' in request.resource.data)
+            || (request.resource.data.jenisTes is string
+                && request.resource.data.jenisTes.size() <= 8))
+        && (!('sesiToken' in request.resource.data)
+            || (request.resource.data.sesiToken is string
+                && request.resource.data.sesiToken.size() <= 20))
 
         && request.resource.data.total is int
         && request.resource.data.total > 0

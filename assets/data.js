@@ -144,6 +144,61 @@
       return Object.keys(this._baca(KUNCI_AKUN, {})).length;
     },
 
+    async ambilSemuaAkun() {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { collection, getDocs } = this._fs;
+        const snap = await getDocs(collection(this._db, 'pretestAkun'));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      const semua = this._baca(KUNCI_AKUN, {});
+      return Object.entries(semua).map(([id, a]) => ({ id, ...a }));
+    },
+
+    // Menghapus SELURUH akun peserta. Dipakai panitia untuk mengosongkan
+    // daftar sebelum angkatan berikutnya; hasil ujian tidak ikut terhapus
+    // kecuali diminta terpisah lewat hapusSemuaHasil().
+    // Mengembalikan jumlah dokumen yang terhapus.
+    async hapusSemuaAkun() {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { collection, getDocs } = this._fs;
+        const snap = await getDocs(collection(this._db, 'pretestAkun'));
+        await this._hapusBanyak(snap.docs.map(d => d.ref));
+        return snap.size;
+      }
+      const n = Object.keys(this._baca(KUNCI_AKUN, {})).length;
+      localStorage.removeItem(KUNCI_AKUN);
+      return n;
+    },
+
+    // Menghapus rekaman nilai. Bila sesiKode diisi, hanya sesi itu yang
+    // dibersihkan; bila kosong, seluruh riwayat ikut terhapus.
+    async hapusSemuaHasil(sesiKode) {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { collection, getDocs } = this._fs;
+        const snap = await getDocs(collection(this._db, this.koleksi));
+        const sasaran = snap.docs.filter(d => !sesiKode || d.data().sesiKode === sesiKode);
+        await this._hapusBanyak(sasaran.map(d => d.ref));
+        return sasaran.length;
+      }
+      const semua = this._baca(KUNCI_HASIL, []);
+      const sisa = sesiKode ? semua.filter(r => r.sesiKode !== sesiKode) : [];
+      this._tulis(KUNCI_HASIL, sisa);
+      return semua.length - sisa.length;
+    },
+
+    // Firestore membatasi satu batch pada 500 tulisan.
+    async _hapusBanyak(refs) {
+      const { writeBatch } = this._fs;
+      for (let i = 0; i < refs.length; i += 400) {
+        const batch = writeBatch(this._db);
+        for (const ref of refs.slice(i, i + 400)) batch.delete(ref);
+        await batch.commit();
+      }
+    },
+
     /* ── SESI UJIAN ────────────────────────────────────────────── */
 
     async ambilSesi() {
@@ -156,15 +211,13 @@
       return this._baca(KUNCI_SESI, null);
     },
 
-    // Menulis sesi memerlukan bukti admin: SHA-256 token admin. Security
-    // Rules membandingkannya dengan dokumen pretestRahasia/admin yang tidak
-    // dapat dibaca klien, jadi hanya pemegang token yang bisa mengubah sesi.
     // Hanya panitia yang sudah masuk lewat Firebase Authentication yang
     // diizinkan aturan Firestore menulis dokumen ini.
     async simpanSesi(sesi) {
       await this.init();
       const isi = {
         kode: sesi.kode || 'sesi',
+        jenis: sesi.jenis === 'post' ? 'post' : 'pre',
         judul: sesi.judul || '',
         token: sesi.token || '',
         mulai: sesi.mulai || null,
@@ -258,19 +311,28 @@
       };
     },
 
-    async emailSudahIkut(email, sesiKode) {
+    // Satu email hanya boleh sekali per sesi DAN per jenis tes: peserta yang
+    // sudah mengerjakan pre-test tetap boleh mengerjakan post-test walaupun
+    // kode sesinya tidak diganti panitia.
+    async emailSudahIkut(email, sesiKode, jenisTes) {
       await this.init();
       const kunci = String(email || '').trim().toLowerCase();
       if (!kunci) return false;
+      const jenis = jenisTes === 'post' ? 'post' : 'pre';
+      const cocok = (r) =>
+        (r.emailKunci || '') === kunci &&
+        (!sesiKode || r.sesiKode === sesiKode) &&
+        ((r.jenisTes || 'pre') === jenis);
+
       if (this.mode === 'firebase') {
-        const { collection, query, where, limit, getDocs } = this._fs;
-        const syarat = [where('emailKunci', '==', kunci)];
-        if (sesiKode) syarat.push(where('sesiKode', '==', sesiKode));
-        const snap = await getDocs(query(collection(this._db, this.koleksi), ...syarat, limit(1)));
-        return !snap.empty;
+        // Disaring di sisi klien: satu email hanya punya segelintir rekaman,
+        // dan cara ini tidak menuntut indeks gabungan di Firestore.
+        const { collection, query, where, getDocs } = this._fs;
+        const snap = await getDocs(query(collection(this._db, this.koleksi),
+          where('emailKunci', '==', kunci)));
+        return snap.docs.some(d => cocok(d.data()));
       }
-      return this._baca(KUNCI_HASIL, []).some(r =>
-        (r.emailKunci || '') === kunci && (!sesiKode || r.sesiKode === sesiKode));
+      return this._baca(KUNCI_HASIL, []).some(cocok);
     },
 
     // Menghapus satu rekaman nilai. Aturan Firestore hanya mengizinkannya

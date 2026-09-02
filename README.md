@@ -1,9 +1,14 @@
-# Pre-Test BIMTEK eMonDAK
+# Pre & Post Test BIMTEK eMonDAK
 
-Situs pre-test daring untuk peserta Bimbingan Teknis aplikasi **eMonitoring DAK**.
-Halaman muka bergaya *edge futuristik* hitam dengan aksen biru–kuning Pekerjaan
-Umum, lalu kuis serentak bergaya Kahoot: peserta punya akun, menunggu di lobi,
-dan mengerjakan bersama-sama dalam jendela waktu yang dibuka panitia.
+Situs **pre-test dan post-test** daring untuk peserta Bimbingan Teknis aplikasi
+**eMonitoring DAK**. Temanya terang — langit cerah, kartu putih, aksen biru tua
+dan emas yang diambil dari lambang eMonitoring DAK — lalu kuis serentak bergaya
+Kahoot: peserta punya akun, menunggu di lobi, dan mengerjakan bersama-sama dalam
+jendela waktu yang dibuka panitia.
+
+Pre-test dan post-test memakai **bank soal yang sama persis**. Yang membedakan
+hanya judul, sebutan di layar, dan pemisahan rekap — jadi selisih nilai sebelum
+dan sesudah materi bimtek benar-benar bisa dibandingkan.
 
 Tanpa kerangka kerja, tanpa proses build: HTML + CSS + JavaScript biasa, sama
 seperti `monev-dak`. Cukup unggah berkasnya, situsnya jalan.
@@ -14,9 +19,12 @@ seperti `monev-dak`. Cukup unggah berkasnya, situsnya jalan.
 
 ```
 Peserta :  akun (nama, email, pemda)  →  lobi (token + hitung mundur)
-           →  20 soal berpoin  →  hasil & pembahasan  →  papan juara
+           →  layar persiapan  →  aba-aba 5 detik  →  20 soal berpoin
+           →  hasil, waktu per soal & pembahasan  →  papan juara
 
-Admin   :  akun panitia  →  atur & buka sesi  →  pantau langsung  →  rekap CSV
+Admin   :  akun panitia  →  pilih jenis tes (pre/post)  →  atur & buka sesi
+           →  pantau langsung + lama sesi berjalan  →  akhiri sesi
+           →  rekap Excel (satu sheet per token) atau CSV
 ```
 
 Peserta tidak memakai kata sandi sama sekali: mereka dikenali dari **email**
@@ -30,19 +38,30 @@ pada jendela waktu yang dibuka panitia.
 
 | Berkas | Isinya |
 | --- | --- |
-| `index.html` | Halaman muka (hero video satu layar penuh) + rangka aplikasi |
-| `assets/style.css` | Seluruh gaya tampilan: tema hitam, ubin jawaban, animasi |
-| `assets/konfig.js` | Nilai bawaan sesi dan rumus poin |
+| `index.html` | Halaman muka (hero langit cerah satu layar penuh) + rangka aplikasi |
+| `assets/style.css` | Seluruh gaya tampilan: tema terang, ubin jawaban, animasi |
+| `assets/konfig.js` | Jenis tes, nilai bawaan sesi, dan rumus poin |
 | `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
 | `assets/soal.js` | Bank soal 25 butir dari berkas .docx penyelenggara |
 | `assets/data.js` | Lapisan penyimpanan: Firestore atau localStorage |
+| `assets/xlsx.js` | Penulis berkas `.xlsx` untuk rekap Excel (tanpa pustaka luar) |
 | `assets/app.js` | Perute halaman, kuis, papan peringkat, ruang admin |
 | `assets/firebase-config.js` | Kunci proyek Firebase + nama koleksi |
+| `assets/logo-emondak.png` | Logo resmi eMonitoring DAK (dipakai di layar lebar) |
+| `assets/lambang-emondak.png` | Lambangnya saja — favicon, layar sempit, cap air hero |
 | `firestore.rules` | Aturan keamanan Firestore beserta cara memasangnya |
 | `dev-server.mjs` | Peladen statis untuk pratinjau lokal (tidak diunggah ke Vercel) |
 
 Alamat di dalam situs: `#/` beranda · `#/cara` · `#/akun` · `#/lobi` ·
-`#/tes` · `#/hasil` · `#/peringkat` · `#/admin` · `#/bantuan`
+`#/siap` · `#/tes` · `#/hasil` · `#/peringkat` · `#/admin` · `#/bantuan`
+
+### Rekap Excel tanpa pustaka luar
+
+`assets/xlsx.js` merakit sendiri berkas `.xlsx`, yang sebenarnya arsip ZIP berisi
+XML. Semua entri ditulis dengan metode *stored* (tanpa kompresi) supaya tidak
+perlu deflate, dan itu tetap sah dibuka Excel, LibreOffice, maupun Google Sheets.
+Alasannya: situs ini statis tanpa proses build, jadi lebih baik menulis ±250 baris
+sendiri daripada menarik pustaka dari CDN yang bisa mati saat hari-H bimtek.
 
 ---
 
@@ -65,25 +84,58 @@ tanpa pemeriksaan karena tidak ada yang bisa diperiksa.
 ## Menjalankan sesi (panitia)
 
 1. Buka `#/admin`, masuk dengan email dan kata sandi akun panitia.
-2. Isi **kode sesi** (mis. `BIMTEK-01`, pembeda rekap antar angkatan),
+2. Pilih **jenis tes**: *Pre-Test* (sebelum materi) atau *Post-Test* (sesudah
+   materi). Soalnya sama; yang berubah hanya judul, sebutan di layar, dan
+   pemisahan rekap. Mengganti pilihan ikut menyesuaikan judul sesi.
+3. Isi **kode sesi** (mis. `BIMTEK-01`, pembeda rekap antar angkatan),
    **token peserta** yang akan dibagikan di kelas, judul, jumlah soal, dan
-   detik per soal.
-3. Tentukan jadwal:
+   detik per soal (`120` = 2 menit per soal; total maksimalnya ditampilkan
+   di bawah kotak isian).
+4. Tentukan jadwal:
    - **Terjadwal** — isi *Dibuka mulai* dan *Ditutup pukul*, lalu Buka sesi.
      Peserta yang menunggu di lobi melihat hitung mundur raksasa dan layarnya
      berganti sendiri saat waktunya tiba.
    - **Langsung** — kosongkan jadwal lalu tekan **Buka sesi sekarang**; sesi
      terbuka seketika dan tertutup otomatis 60 menit kemudian.
-4. Bacakan tokennya. Peserta memasukkannya di lobi dan langsung mulai.
-5. Pantau di bagian **Pemantauan langsung** — jumlah yang sudah mengisi,
-   rata-rata poin dan nilai, tabel peserta, serta analisis butir soal. Angkanya
-   berubah sendiri setiap ada yang selesai.
-6. **Tutup sesi sekarang** menghentikan penerimaan peserta baru. Yang sedang
-   mengerjakan otomatis dikumpulkan lembar jawabannya begitu jendela waktu
-   habis.
+5. Bacakan tokennya. Peserta memasukkannya di lobi, lalu berhenti di **layar
+   persiapan**. Sesudah semua masuk, beri aba-aba: peserta menekan *Kerjakan*,
+   muncul hitung mundur 5 detik, dan seisi kelas membuka soal pertama bersamaan.
+6. Lencana di kanan kartu sesi menunjukkan **sudah berapa lama sesi berjalan**
+   dan sisa waktunya, berdenyut tiap detik.
+7. Pantau di bagian **Pemantauan langsung** — jumlah yang sudah mengisi,
+   rata-rata poin dan nilai, rata-rata waktu kerja, tabel peserta, serta
+   **rekap waktu penyelesaian tiap soal** (rata-rata, tercepat, terlama, dan
+   berapa kali kehabisan waktu). Kotak *Tampilkan* menyaring per token atau
+   membuka seluruh riwayat. Angkanya berubah sendiri setiap ada yang selesai.
+8. **Akhiri sesi sekarang** menghentikan penerimaan peserta baru. Yang sedang
+   mengerjakan otomatis dikumpulkan lembar jawabannya.
+9. Unduh **Excel** (satu sheet per token: peserta, waktu per soal, ditambah
+   sheet ringkasan dan rincian jawaban) atau **CSV** untuk daftar yang sedang
+   ditampilkan.
 
 Jam yang dipakai adalah jam perangkat masing-masing. Selisih beberapa menit
 antar laptop peserta itu wajar, jadi beri jarak jadwal secukupnya.
+
+Satu email boleh mengerjakan **satu kali per kode sesi untuk tiap jenis tes** —
+peserta yang sudah ikut pre-test tetap bisa ikut post-test walaupun kode sesinya
+tidak diganti.
+
+---
+
+## Membersihkan data sebelum angkatan berikutnya
+
+Di bagian **Pembersihan data** pada Ruang Admin ada tiga tombol:
+
+| Tombol | Yang dihapus | Yang tetap utuh |
+| --- | --- | --- |
+| Hapus semua akun peserta | Seluruh isi `pretestAkun` | Semua nilai yang sudah masuk |
+| Hapus hasil sesi ini | Nilai pada kode sesi yang sedang aktif | Akun peserta & sesi lain |
+| Hapus seluruh riwayat hasil | Seluruh isi `pretestHasil` | Akun peserta |
+
+Ketiganya meminta konfirmasi **dua kali**: kotak "yakin?" lalu mengetik ulang
+kata `HAPUS` (atau `HAPUS SEMUA` untuk yang terakhir). Tidak ada pembatalan
+sesudahnya. Peserta yang akunnya dihapus cukup mendaftar ulang dengan email yang
+sama.
 
 ---
 
@@ -139,8 +191,13 @@ Koleksinya:
 | Koleksi | Isi |
 | --- | --- |
 | `pretestAkun/{idAkun}` | profil peserta — nama, email, pemda, provinsi |
-| `pretestSesi/aktif` | jadwal & token sesi yang sedang berjalan |
-| `pretestHasil/{auto}` | nilai akhir tiap peserta |
+| `pretestSesi/aktif` | jenis tes, jadwal, & token sesi yang sedang berjalan |
+| `pretestHasil/{auto}` | nilai akhir tiap peserta, termasuk waktu tiap butir soal |
+
+Tiap rekaman di `pretestHasil` menyimpan larik `jawaban`, satu entri per butir
+berisi `id` soal, nomor urutnya di layar peserta, pilihan, benar/salah, poin, dan
+**`detik`** — lama peserta memikirkan butir itu. Dari situlah seluruh rekap waktu
+di Ruang Admin, di halaman hasil peserta, dan di berkas Excel dihitung.
 
 Yang disiapkan manual di Firebase Console (petunjuk lengkap di bagian atas
 `firestore.rules`): **akun panitia** di Authentication, **daftar email panitia**
@@ -149,7 +206,8 @@ pada fungsi `emailAdmin()`, dan **aturan keamanan** yang ditempel lalu Publish.
 Aturannya: dokumen boleh dibuat siapa pun (peserta memang tidak login) tetapi
 isinya diperiksa ketat. Nilai **tidak bisa diubah oleh siapa pun**, termasuk
 panitia — terkunci begitu terkirim. Yang boleh dilakukan panitia adalah
-menghapus rekaman (tombol ✕ pada tabel rekap) dan menulis pengaturan sesi.
+menghapus rekaman (tombol ✕ pada tabel rekap, atau tombol pembersihan massal)
+dan menulis pengaturan sesi.
 
 > **Catatan privasi.** Papan peringkat hanya menampilkan nama, pemda, dan poin,
 > tetapi email peserta tersimpan pada dokumen yang sama dan secara teknis ikut
@@ -212,7 +270,11 @@ dipakai menyusun ulang pembahasan dan analisis butir soal.
   tertutup atau dimuat ulang kembali ke soal yang sama dengan poin utuh —
   hitung mundur tetap berjalan selama itu, jadi menyegarkan halaman tidak
   memberi keuntungan.
-- Satu akun hanya boleh mengerjakan satu kali per kode sesi.
+- Satu akun hanya boleh mengerjakan satu kali per kode sesi untuk tiap jenis
+  tes — pre-test dan post-test dihitung terpisah.
+- Layar persiapan dan aba-aba 5 detik ikut tersimpan: peserta yang halamannya
+  tertutup sebelum menekan *Kerjakan* kembali ke layar persiapan, bukan langsung
+  ke soal. Hitungan waktu kerja baru mulai sesudah aba-aba selesai.
 - Bila jendela waktu sesi berakhir di tengah pengerjaan, lembar jawaban
   dikumpulkan otomatis dan halaman hasil memberi tahu alasannya.
 - Bila pengiriman nilai gagal (jaringan atau aturan Firestore belum dipasang),

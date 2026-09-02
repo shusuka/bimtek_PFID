@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Pre-Test BIMTEK eMonDAK — PFID Bidang Jalan</title>
-<meta name="description" content="Pre-test daring peserta Bimbingan Teknis aplikasi eMonitoring DAK. Masuk dengan nama, email, instansi, dan token dari panitia." />
-<meta name="theme-color" content="#05070c" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2305070c'/%3E%3Cpath d='M8 22 L16 8 L24 22' fill='none' stroke='%23FFC72C' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M11.5 17.5h9' stroke='%233FA9FF' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<title>Pre &amp; Post Test BIMTEK eMonitoring DAK</title>
+<meta name="description" content="Pre-test dan post-test daring peserta Bimbingan Teknis aplikasi eMonitoring DAK. Masuk dengan akun daerah, tunggu aba-aba panitia, lalu kerjakan bersama-sama." />
+<meta name="theme-color" content="#f2f6fc" />
+<link rel="icon" href="assets/lambang-emondak.png" />
+<link rel="apple-touch-icon" href="assets/lambang-emondak.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -15,20 +16,20 @@
 <body>
 
 <!-- ══════════════════════════════════════════════════════════════
-     BERANDA — hero satu layar penuh
+     BERANDA — hero satu layar penuh, latar langit cerah
      ══════════════════════════════════════════════════════════════ -->
 <section class="hero" id="beranda">
 
-  <!-- latar video: otomatis jalan, tanpa suara, berulang, tanpa kendali -->
-  <video class="hero-video" autoplay muted loop playsinline preload="none"></video>
+  <!-- latar video hanya dipasang bila KONFIG.videoHero diisi -->
+  <video class="hero-video" muted loop playsinline preload="none" hidden></video>
 
-  <!-- lapisan gelap hanya di bagian bawah; bagian atas video dibiarkan bening -->
-  <div class="lapis-bawah"></div>
-  <div class="lapis-vignette"></div>
+  <!-- lapisan latar cerah: gradasi langit, awan lembut, kisi tipis -->
+  <div class="lapis-langit"></div>
+  <div class="lapis-awan"></div>
   <div class="lapis-grid"></div>
   <div class="cahaya-bawah"></div>
 
-  <!-- titik bintang -->
+  <!-- kilau kecil -->
   <span class="bintang b1"></span>
   <span class="bintang b2"></span>
   <span class="bintang b3"></span>
@@ -38,14 +39,11 @@
 
   <!-- ── navbar ── -->
   <nav class="navbar">
-    <a class="merek" href="#/" aria-label="Beranda Pre-Test BIMTEK eMonDAK">
-      <svg class="merek-ikon" width="36" height="36" viewBox="0 0 45 45" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M31.949 14.4493C36.3622 19.7088 35.7552 27.386 30.7224 31.609C28.6651 33.3352 26.1803 34.2304 23.6536 34.332C22.8012 34.3662 22.1381 35.085 22.1724 35.9373C22.2065 36.7897 22.9253 37.4529 23.7777 37.4186C26.956 37.2909 30.1034 36.1609 32.708 33.9754C39.1103 28.6033 39.7721 18.9667 34.3154 12.4637C28.8588 5.96073 19.2537 4.93901 12.8514 10.3112C10.2468 12.4967 8.58745 15.4 7.90978 18.508C7.72799 19.3414 8.25624 20.1644 9.0898 20.3461C9.92324 20.5279 10.7462 19.9996 10.9279 19.1661C11.4667 16.6954 12.7798 14.4038 14.837 12.6776C19.8698 8.45456 27.5358 9.18983 31.949 14.4493ZM25.3365 25.6158C26.9702 24.245 27.1833 21.8093 25.8125 20.1756C24.4416 18.542 22.006 18.3289 20.3723 19.6997C18.7387 21.0705 18.5256 23.5062 19.8964 25.1398C21.2672 26.7735 23.7028 26.9866 25.3365 25.6158ZM26.6852 27.2503C29.2017 25.3016 29.6692 21.5171 27.5433 18.7718C25.4175 16.0264 21.6364 15.5317 19.1199 17.4803C17.957 18.3809 17.2378 19.6567 17.0014 21.0484C17.0051 21.1214 17.0037 21.1955 16.9969 21.2704C16.9189 22.1198 16.1671 22.7453 15.3177 22.6673C13.8978 22.5371 12.4666 22.9126 11.2925 23.8218C8.77601 25.7704 8.30857 29.5549 10.4344 32.3003C12.5603 35.0456 16.3413 35.5403 18.8578 33.5917C20.0208 32.6912 20.74 31.4153 20.9763 30.0236C20.9726 29.9506 20.974 29.8765 20.9809 29.8017C21.0588 28.9522 21.8106 28.3267 22.66 28.4047C24.0799 28.535 25.5111 28.1594 26.6852 27.2503ZM23.8052 31.4988C25.4883 31.3861 27.1509 30.7967 28.5766 29.6927C32.535 26.6275 33.0827 20.8798 29.9858 16.8804C26.8889 12.8811 21.1871 11.9726 17.2286 15.0378C15.6945 16.2258 14.6685 17.8285 14.1726 19.5733C12.4894 19.6859 10.8268 20.2754 9.40117 21.3793C5.44273 24.4445 4.89505 30.1922 7.99195 34.1916C11.0888 38.1909 16.7907 39.0994 20.7491 36.0342C22.2832 34.8463 23.3093 33.2435 23.8052 31.4988Z" fill="currentColor"></path>
-      </svg>
-      <span class="merek-teks">
-        <strong>eMon<span class="kuning">DAK</span></strong>
-        <small>Pre-Test BIMTEK</small>
-      </span>
+    <a class="merek" href="#/" aria-label="Beranda Pre &amp; Post Test BIMTEK eMonitoring DAK">
+      <img class="merek-lambang" src="assets/lambang-emondak.png" width="44" height="47"
+           alt="Lambang eMonitoring DAK" />
+      <img class="merek-logo" src="assets/logo-emondak.png" width="447" height="349"
+           alt="eMonitoring DAK — Pemantauan Dana Alokasi Khusus" />
     </a>
 
     <div class="nav-kanan">
@@ -67,13 +65,8 @@
 
     <h1 class="judul-hero">Uji Kesiapan <span>Operator DAK</span></h1>
 
-    <p class="sub-hero">
-      Pre-test serentak sebelum bimbingan teknis eMonitoring DAK — masuk dengan akun daerah,<br />
-      tunggu aba-aba panitia, lalu jawab secepat mungkin untuk merebut poin tertinggi.
-    </p>
-
-    <a class="tombol-utama" href="#/akun">
-      Mulai Pre-Test
+    <a class="tombol-utama" href="#/akun" id="tombolMulai">
+      Mulai Tes
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 12h15"></path>
         <path d="M13.5 5.5 20 12l-6.5 6.5"></path>
@@ -93,6 +86,7 @@
 <script src="assets/firebase-config.js"></script>
 <script src="assets/wilayah.js"></script>
 <script src="assets/soal.js"></script>
+<script src="assets/xlsx.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/app.js"></script>
 </body>

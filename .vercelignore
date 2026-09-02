@@ -4,3 +4,6 @@
 dev-server.mjs
 firestore.rules
 README.md
+
+# Konfigurasi pratinjau lokal Claude Code
+.claude
