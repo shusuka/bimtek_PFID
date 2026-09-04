@@ -18,7 +18,27 @@
   'use strict';
 
   const K = window.KONFIG || {};
-  const BANK = window.SOAL_PRETEST || [];
+  // Bank soal punya dua lapis: yang ikut ter-deploy (assets/soal.js) dan
+  // yang diimpor panitia dari Ruang Admin (Firestore pretestBank/aktif).
+  // Selama ada hasil impor, itulah yang dipakai seluruh peserta.
+  const BANK_BAWAAN = window.SOAL_PRETEST || [];
+  let BANK = BANK_BAWAAN.slice();
+  let bankInfo = null;
+
+  function pakaiBank(dok) {
+    bankInfo = dok && Array.isArray(dok.soal) && dok.soal.length ? dok : null;
+    BANK = bankInfo ? bankInfo.soal : BANK_BAWAAN.slice();
+  }
+
+  // Soal terbanyak yang bisa diundikan untuk satu peserta: satu wakil per
+  // grup soal kembar, supaya tidak ada soal kembar dalam satu lembar.
+  //
+  // Ditahan pula pada BATAS_SOAL, angka yang sama dengan batas "total" pada
+  // firestore.rules. Tanpa penahan ini, mengimpor bank soal yang sangat besar
+  // membuat panitia bisa menyetel sesi yang nilainya justru ditolak aturan
+  // Firestore saat peserta mengumpulkan jawaban.
+  const BATAS_SOAL = 60;
+  const maksButir = () => Math.min(new Set(BANK.map(s => s.grup || s.id)).size, BATAS_SOAL);
   // Latar beranda kini digambar CSS. Isi KONFIG.videoHero bila ingin
   // memakai video lagi.
   const VIDEO_HERO = K.videoHero || '';
@@ -262,8 +282,11 @@
       if (!perGrup.has(g)) perGrup.set(g, []);
       perGrup.get(g).push(s);
     }
+    // Wakil tiap grup dipilih acak, urutan soal diacak, lalu urutan pilihan
+    // A–D tiap soal ikut diacak — dua peserta yang duduk bersebelahan tidak
+    // pernah mendapat lembar yang sama.
     const wakil = [...perGrup.values()].map(d => d[Math.floor(Math.random() * d.length)]);
-    return acak(wakil).slice(0, Math.min(jumlah || 20, wakil.length)).map(s => ({
+    return acak(wakil).slice(0, Math.min(jumlah || 25, wakil.length)).map(s => ({
       id: s.id,
       urut: acak(s.o.map((_, i) => i))
     }));
@@ -595,7 +618,7 @@
       <div class="lencana-jenis ${jenisSah(sesi.jenis)}">${aman(infoJenis(sesi.jenis).label)}</div>
       <div class="sesi-judul">${aman(sesi.judul || K.namaSesi)}</div>
       <div class="sesi-rinci">
-        ${sesi.jumlahSoal || 20} soal · ${lamaSoal(sesi.detikPerSoal || 30)} per soal
+        ${Math.min(sesi.jumlahSoal || 25, maksButir())} soal · ${lamaSoal(sesi.detikPerSoal || 30)} per soal
         ${sesi.mulai ? ' · mulai ' + aman(tanggalIndo(sesi.mulai)) : ''}
       </div>` : '';
 
@@ -657,6 +680,12 @@
         }
       } catch (e) { console.warn('[lobi] gagal memeriksa peserta:', e); }
 
+      // Panitia bisa mengimpor soal baru sesudah halaman ini terbuka, jadi
+      // bank disegarkan sekali di sini supaya lembar yang diundi memakai
+      // bank yang paling akhir disimpan.
+      try { pakaiBank(await window.DB.ambilBank()); }
+      catch (e) { console.warn('[lobi] gagal menyegarkan bank soal:', e); }
+
       main = {
         akun,
         sesiKode: sesi.kode || 'sesi',
@@ -666,7 +695,7 @@
         detikPerSoal: sesi.detikPerSoal || 30,
         poinCepat: sesi.poinCepat !== false,
         batasSesi: sesi.selesai || null,
-        butir: undiButir(sesi.jumlahSoal || 20),
+        butir: undiButir(sesi.jumlahSoal || 25),
         indeks: 0,
         jawaban: {},
         poin: 0,
@@ -1314,7 +1343,14 @@
         <div class="kartu" id="kartuSesi"><div class="kosong">Memuat pengaturan sesi…</div></div>
         <div id="pesanSesi"></div>
 
-        <h2 class="judul-halaman" style="font-size:20px;margin:32px 0 6px">Pemantauan langsung</h2>
+        <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Bank soal</h2>
+        <p class="ket-halaman">
+          Soal yang diundikan ke peserta. Bila penyelenggara mengirim revisi, masukkan di sini —
+          berlaku seketika untuk semua peserta, tanpa perlu memasang ulang aplikasi.
+        </p>
+        <div class="kartu" id="kartuBank"><div class="kosong">Memuat bank soal…</div></div>
+
+        <h2 class="judul-halaman" style="font-size:20px;margin:38px 0 6px">Pemantauan langsung</h2>
         <p class="ket-halaman">Angka di bawah ikut berubah sendiri saat peserta mengumpulkan jawaban.</p>
         <div id="isiAdmin" class="kosong">Memuat data…</div>
 
@@ -1325,13 +1361,22 @@
         </p>
         <div class="kartu kartu-bahaya" id="kartuBahaya">
           <div class="baris-tombol">
-            <button class="btn btn-bahaya" id="btnHapusAkun">Hapus semua akun peserta</button>
+            <button class="btn btn-bahaya" id="btnResetUji">Reset masa uji coba — hapus semua pendaftar &amp; nilai</button>
+          </div>
+          <p class="ket-halaman" style="margin:12px 0 18px">
+            Dipakai selama uji coba: seluruh akun yang sudah mendaftar dan seluruh nilai dibuang
+            sekaligus, sehingga orang yang sama bisa mendaftar dan mengerjakan lagi dari nol.
+            Konfirmasinya diketik <b class="tegas">saya akan lawan</b>.
+          </p>
+          <div class="baris-tombol">
+            <button class="btn btn-hantu" id="btnHapusAkun">Hapus akun peserta saja</button>
             <button class="btn btn-hantu" id="btnHapusHasilSesi">Hapus hasil sesi ini</button>
             <button class="btn btn-hantu" id="btnHapusHasilSemua">Hapus seluruh riwayat hasil</button>
           </div>
           <p class="ket-halaman" style="margin:14px 0 0">
-            Menghapus akun tidak menghapus nilai yang sudah masuk, dan sebaliknya.
-            Peserta yang akunnya dihapus cukup mendaftar ulang dengan email yang sama.
+            Tiga tombol di atas bekerja sendiri-sendiri: menghapus akun tidak menghapus nilai yang
+            sudah masuk, dan sebaliknya. Peserta yang akunnya dihapus cukup mendaftar ulang dengan
+            email yang sama.
           </p>
           <div id="pesanBahaya"></div>
         </div>
@@ -1343,11 +1388,23 @@
       ke('#/');
     };
 
+    // ── bank soal ──
+    imporKini = null;
+    gambarBank();
+
     // ── kendali sesi ──
+    let daftarKini = [];
+    let sidikSesi = null;
     sesiTergambar = null;
     lepasPantau = window.DB.pantauSesi((dok) => {
       sesi = dok || { ...(K.sesiBawaan || {}) };
       gambarKendaliSesi();
+      // Kode dan token sesi ikut menentukan isi tabel pemantauan beserta
+      // daftar pilihan penyaringnya, jadi tabel digambar ulang begitu salah
+      // satunya berubah. Tanpa ini, sesi yang baru dibuat tidak muncul di
+      // kotak "Tampilkan" sampai ada peserta pertama yang mengumpulkan.
+      const sidik = (sesi.kode || '') + '|' + (sesi.token || '');
+      if (sidik !== sidikSesi) { sidikSesi = sidik; gambarPantauan(daftarKini); }
     });
 
     // Penunjuk lama sesi berdenyut sendiri tiap detik. Hanya isi teksnya yang
@@ -1356,7 +1413,6 @@
     jamId = setInterval(perbaruiJamSesi, 1000);
 
     // ── pemantauan hasil ──
-    let daftarKini = [];
     const lepasHasil = window.DB.pantauHasil((daftar) => {
       daftarKini = urutkan(daftar);
       gambarPantauan(daftarKini);
@@ -1372,17 +1428,28 @@
 
   /* ── tombol pembersihan data ─────────────────────────────────────
      Sengaja meminta pengetikan ulang kata kunci, bukan sekadar OK,
-     karena satu klik keliru menghapus seluruh daftar peserta. */
+     karena satu klik keliru menghapus seluruh daftar peserta.
+
+     Tindakan yang menyentuh akun peserta memakai kata kunci "saya akan
+     lawan" atas permintaan penyelenggara — kalimatnya panjang dan tidak
+     mungkin terketik tanpa sengaja. */
+
+  const KATA_PESERTA = 'saya akan lawan';
 
   function pasangTombolBahaya(ambilDaftar) {
     const pesan = $('#pesanBahaya');
     if (!pesan) return;
 
+    // Perbandingan tidak peka huruf besar/kecil maupun spasi berlebih,
+    // supaya panitia tidak gagal hanya karena mengetik "Saya Akan Lawan".
+    const samakan = (t) => String(t == null ? '' : t).trim().replace(/\s+/g, ' ').toLowerCase();
+
     const kerjakan = async (tombol, kataKunci, tanya, aksi, sesudah) => {
       if (!confirm(tanya)) return;
-      const ketik = prompt('Ketik ' + kataKunci + ' untuk memastikan:');
-      if (String(ketik || '').trim().toUpperCase() !== kataKunci) {
-        pesan.innerHTML = '<div class="pesan pesan-info">Dibatalkan — kata kunci tidak cocok.</div>';
+      const ketik = prompt('Ketik "' + kataKunci + '" untuk memastikan:');
+      if (ketik === null) return;
+      if (samakan(ketik) !== samakan(kataKunci)) {
+        pesan.innerHTML = '<div class="pesan pesan-info">Dibatalkan — kata kuncinya tidak cocok.</div>';
         return;
       }
       const teksAsli = tombol.textContent;
@@ -1399,10 +1466,26 @@
       tombol.disabled = false; tombol.textContent = teksAsli;
     };
 
+    // Reset masa uji coba: akun DAN nilai dibuang sekaligus, supaya orang
+    // yang sama bisa mendaftar lagi lalu mengerjakan lagi dari nol.
+    const tReset = $('#btnResetUji');
+    if (tReset) tReset.onclick = () => kerjakan(tReset, KATA_PESERTA,
+      'RESET MASA UJI COBA\n\n' +
+      'Seluruh akun peserta yang sudah mendaftar DAN seluruh nilai yang pernah masuk ' +
+      'akan dihapus, dari semua sesi dan semua angkatan.\n\n' +
+      'Sesudah ini semua orang bisa mendaftar ulang dan mengerjakan lagi dari nol. Lanjutkan?',
+      async () => {
+        const akun = await window.DB.hapusSemuaAkun();
+        const nilai = await window.DB.hapusSemuaHasil(null);
+        return { akun, nilai };
+      },
+      n => n.akun + ' akun peserta dan ' + n.nilai + ' rekaman nilai terhapus. ' +
+           'Pendaftaran sekarang benar-benar kosong.');
+
     const tAkun = $('#btnHapusAkun');
-    if (tAkun) tAkun.onclick = () => kerjakan(tAkun, 'HAPUS',
+    if (tAkun) tAkun.onclick = () => kerjakan(tAkun, KATA_PESERTA,
       'Hapus SELURUH akun peserta yang pernah mendaftar?\n' +
-      'Nilai yang sudah masuk tidak ikut terhapus.',
+      'Nilai yang sudah masuk TIDAK ikut terhapus.',
       () => window.DB.hapusSemuaAkun(),
       n => n + ' akun peserta terhapus.');
 
@@ -1465,11 +1548,14 @@
   function gambarKendaliSesi() {
     const kotak = $('#kartuSesi');
     if (!kotak) return;
-    const cap = JSON.stringify(sesi || null);
+    // Isi bank ikut disidik: mengimpor soal mengubah batas "jumlah soal",
+    // jadi formulirnya perlu digambar ulang.
+    const cap = JSON.stringify([sesi || null, BANK.length, maksButir()]);
     if (cap === sesiTergambar) return;
     sesiTergambar = cap;
     const s = sesi || {};
     const st = statusSesi(s);
+    const maks = maksButir();
     const lampu = { buka: 'lampu-buka', menunggu: 'lampu-tunggu' }[st.keadaan] || 'lampu-tutup';
     const ket = {
       buka: 'Sesi TERBUKA — peserta bisa masuk dengan token',
@@ -1527,14 +1613,16 @@
           <input id="sSelesai" type="datetime-local" value="${keInputWaktu(s.selesai)}" />
         </div>
         <div class="kolom">
-          <label for="sJumlah">Jumlah soal (maks. 21)</label>
-          <input id="sJumlah" type="number" min="5" max="21" value="${Number(s.jumlahSoal || 20)}" />
+          <label for="sJumlah">Jumlah soal (maks. ${maks})</label>
+          <input id="sJumlah" type="number" min="5" max="${maks}" value="${Math.min(Number(s.jumlahSoal || 25), maks)}" />
+          <span class="petunjuk">Batasnya ${maks} — sebanyak grup soal unik di bank.
+            Tambah butir lewat "Bank soal" di bawah bila perlu lebih banyak.</span>
         </div>
         <div class="kolom">
           <label for="sDetik">Detik per soal</label>
           <input id="sDetik" type="number" min="10" max="600" value="${Number(s.detikPerSoal || 30)}" />
           <span class="petunjuk">120 = 2 menit per soal. Total maksimal
-            ${mmss(Number(s.jumlahSoal || 20) * Number(s.detikPerSoal || 30))}.</span>
+            ${mmss(Math.min(Number(s.jumlahSoal || 25), maks) * Number(s.detikPerSoal || 30))}.</span>
         </div>
         <div class="kolom kolom-lebar">
           <label class="centang">
@@ -1560,7 +1648,7 @@
       judul: $('#sJudul').value.trim(),
       mulai: $('#sMulai').value ? new Date($('#sMulai').value).toISOString() : null,
       selesai: $('#sSelesai').value ? new Date($('#sSelesai').value).toISOString() : null,
-      jumlahSoal: Math.min(21, Math.max(5, Number($('#sJumlah').value) || 20)),
+      jumlahSoal: Math.min(maksButir(), Math.max(5, Number($('#sJumlah').value) || 25)),
       detikPerSoal: Math.min(600, Math.max(10, Number($('#sDetik').value) || 30)),
       poinCepat: $('#sPoinCepat').checked,
       aktif: !!(sesi && sesi.aktif)
@@ -1650,6 +1738,12 @@
       if (!t) continue;
       hitungToken.set(t, (hitungToken.get(t) || 0) + 1);
     }
+    // Token sesi yang baru dibuat belum punya satu peserta pun. Kalau hanya
+    // token milik peserta yang didaftar, sesi baru itu tidak muncul sama
+    // sekali di kotak penyaring dan panitia mengira sesinya gagal dibuat.
+    const tokenSesi = String((sesi && sesi.token) || '').trim().toUpperCase();
+    if (tokenSesi && !hitungToken.has(tokenSesi)) hitungToken.set(tokenSesi, 0);
+    if (saringToken && saringToken !== '*' && !hitungToken.has(saringToken)) hitungToken.set(saringToken, 0);
     const pilihanToken = [...hitungToken.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
     let jumlahAkun = '—';
@@ -1675,7 +1769,8 @@
             <option value=""${saringToken === '' ? ' selected' : ''}>Sesi berjalan${kode ? ' — ' + aman(kode) : ''}</option>
             <option value="*"${saringToken === '*' ? ' selected' : ''}>Seluruh riwayat (semua angkatan)</option>
             ${pilihanToken.map(([t, j]) => `
-              <option value="${aman(t)}"${saringToken === t ? ' selected' : ''}>Token ${aman(t)} — ${j} peserta</option>`).join('')}
+              <option value="${aman(t)}"${saringToken === t ? ' selected' : ''}>Token ${aman(t)}${
+                  t === tokenSesi ? ' (sesi berjalan)' : ''} — ${j ? j + ' peserta' : 'belum ada peserta'}</option>`).join('')}
           </select>
           <span class="petunjuk">Rekap Excel selalu memisahkan tiap token menjadi sheet sendiri.</span>
         </div>
@@ -1985,6 +2080,284 @@
     window.XLSX.unduh(`rekap-tes-emondak-${new Date().toISOString().slice(0, 10)}.xlsx`, sheets);
   }
 
+  /* ── 5g-2. Bank soal: impor tanpa deploy ulang ───────────────────
+     Bank bawaan ikut ter-deploy, tetapi penyelenggara kerap mengirim
+     revisi soal beberapa jam sebelum kelas dimulai. Bagian ini
+     memasukkannya lewat Ruang Admin: berkas dibaca di peramban panitia,
+     ditampilkan dulu sebagai pratinjau yang masih bisa dibetulkan
+     (kunci jawaban, penanda soal kembar, pembahasan), baru disimpan ke
+     Firestore dan langsung dipakai peserta berikutnya. */
+
+  let imporKini = null;   // hasil baca yang sedang dipratinjau
+
+  function gambarBank() {
+    const kotak = $('#kartuBank');
+    if (!kotak) return;
+    const maks = maksButir();
+    const asal = bankInfo
+      ? 'Hasil impor panitia — ' + (bankInfo.sumber || 'tanpa nama berkas') +
+        (bankInfo.diubah ? ' · ' + tanggalIndo(bankInfo.diubah) : '')
+      : 'Bank bawaan aplikasi (assets/soal.js)';
+
+    kotak.innerHTML = `
+      <div class="grid-statistik">
+        <div class="statistik sorot"><div class="angka">${BANK.length}</div><div class="nama">Butir tersimpan</div></div>
+        <div class="statistik"><div class="angka">${maks}</div><div class="nama">Maks soal per peserta</div></div>
+        <div class="statistik"><div class="angka">${BANK.length - maks}</div><div class="nama">Butir kembar (digrup)</div></div>
+      </div>
+      <p class="ket-halaman" style="margin:4px 0 18px">
+        Sumber sekarang: <b class="tegas">${aman(asal)}</b>
+      </p>
+      <form class="formulir" id="formImpor">
+        <div class="kolom">
+          <label for="fBerkasSoal">Berkas soal</label>
+          <input id="fBerkasSoal" type="file" accept=".docx,.json,.txt,.csv,.md" />
+          <span class="petunjuk">
+            .docx kiriman penyelenggara, .json cadangan aplikasi ini, atau .txt biasa.
+            Berkas dibaca di peramban ini saja — tidak diunggah ke mana pun.
+          </span>
+        </div>
+        <div class="kolom">
+          <label for="fTempelSoal">…atau tempel teks soalnya</label>
+          <textarea id="fTempelSoal" rows="5"
+            placeholder="Bagaimana cara mengakses eMonDAK?&#10;[✔] A. Lewat Portal FID&#10;[ ] B. Lewat Play Store"></textarea>
+          <span class="petunjuk">
+            Tandai kunci dengan [✔] di depan pilihan, atau tulis baris
+            “Jawaban benar: A” sesudah pilihan terakhir. Kunci yang tidak terbaca
+            masih bisa dipilih sendiri pada pratinjau.
+          </span>
+        </div>
+        <div class="baris-tombol">
+          <button class="btn btn-biru" type="submit">Baca &amp; pratinjau</button>
+          <button class="btn btn-hantu" type="button" id="btnUnduhBank">Unduh cadangan (JSON)</button>
+          ${bankInfo ? '<button class="btn btn-hantu" type="button" id="btnBankBawaan">Kembalikan ke bank bawaan</button>' : ''}
+        </div>
+      </form>
+      <div id="pesanBank"></div>
+      <div id="pratinjauBank"></div>`;
+
+    const pesan = $('#pesanBank');
+
+    $('#formImpor').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const berkas = $('#fBerkasSoal').files[0];
+      const tempel = $('#fTempelSoal').value.trim();
+      if (!berkas && !tempel) {
+        pesan.innerHTML = '<div class="pesan pesan-galat">Pilih berkasnya dulu, atau tempel teks soal pada kotak di atas.</div>';
+        return;
+      }
+      pesan.innerHTML = '<div class="pesan pesan-info">Membaca soal…</div>';
+      try {
+        const dibaca = berkas
+          ? await window.ImporSoal.dariBerkas(berkas)
+          : { ...window.ImporSoal.dariTeks(tempel), sumber: 'teks yang ditempel' };
+        if (!dibaca.soal.length) {
+          pesan.innerHTML = '<div class="pesan pesan-galat">Tidak ada soal yang terbaca dari sumber itu. ' +
+            'Pastikan tiap pertanyaan diikuti pilihan yang diawali A. B. C. D.</div>';
+          return;
+        }
+        imporKini = {
+          sumber: dibaca.sumber,
+          catatan: dibaca.catatan,
+          soal: window.ImporSoal.berikanId(dibaca.soal, BANK)
+        };
+        pesan.innerHTML = '';
+        gambarPratinjauImpor();
+        $('#pratinjauBank').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        console.error('[bank] gagal membaca berkas soal:', e);
+        pesan.innerHTML = '<div class="pesan pesan-galat">' + aman(e.message || String(e)) + '</div>';
+      }
+    };
+
+    // Cadangan dipakai dua arah: sebagai arsip, dan sebagai berkas yang
+    // bisa diimpor kembali bila suatu saat perlu dikembalikan.
+    $('#btnUnduhBank').onclick = () => {
+      const isi = JSON.stringify({
+        namaSesi: K.namaSesi || '',
+        diunduh: new Date().toISOString(),
+        soal: BANK.map(s => ({ id: s.id, q: s.q, o: s.o, a: s.a, bahas: s.bahas || '', grup: s.grup || '' }))
+      }, null, 2);
+      const blob = new Blob([isi], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bank-soal-emondak-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const tBawaan = $('#btnBankBawaan');
+    if (tBawaan) tBawaan.onclick = async () => {
+      if (!confirm('Buang bank soal hasil impor dan kembali memakai bank bawaan aplikasi?\n' +
+        'Soal yang pernah diimpor akan hilang kecuali cadangannya sudah diunduh.')) return;
+      tBawaan.disabled = true;
+      try {
+        await window.DB.hapusBank();
+        pakaiBank(null);
+        imporKini = null;
+        gambarBank();
+        sesiTergambar = null;
+        gambarKendaliSesi();
+        $('#pesanBank').innerHTML = '<div class="pesan pesan-info">Bank bawaan aplikasi dipakai kembali.</div>';
+      } catch (e) {
+        tBawaan.disabled = false;
+        $('#pesanBank').innerHTML = '<div class="pesan pesan-galat">Gagal: ' + aman(e.code || e.message) + '</div>';
+      }
+    };
+  }
+
+  /* Pratinjau hasil baca. Sengaja bisa disunting: dokumen Word tidak
+     selalu memuat kunci jawaban, dan penanda soal kembar memang harus
+     ditentukan manusia. */
+  function gambarPratinjauImpor() {
+    const kotak = $('#pratinjauBank');
+    if (!kotak) return;
+    if (!imporKini) { kotak.innerHTML = ''; return; }
+
+    const d = imporKini.soal;
+    const baru = d.filter(s => s.baru).length;
+    const tanpaKunci = d.filter(s => !(s.a >= 0)).length;
+
+    kotak.innerHTML = `
+      <h3 class="judul-halaman" style="font-size:17px;margin:30px 0 6px">
+        Pratinjau — ${d.length} butir dari ${aman(imporKini.sumber || 'sumber tanpa nama')}
+      </h3>
+      <p class="ket-halaman">
+        ${baru} butir baru, ${d.length - baru} butir sudah ada di bank (id lamanya dipakai lagi
+        supaya rekap nilai yang telanjur masuk tidak putus).
+        ${tanpaKunci ? `<b class="tegas">${tanpaKunci} butir belum punya kunci</b> — pilih dulu pada kolom Kunci.` : ''}
+      </p>
+      ${imporKini.catatan.length ? `
+        <div class="pesan pesan-info">
+          <b>Catatan pembacaan:</b>
+          <ul style="margin:8px 0 0 18px;padding:0">
+            ${imporKini.catatan.slice(0, 12).map(c => `<li>${aman(c)}</li>`).join('')}
+            ${imporKini.catatan.length > 12 ? `<li>…dan ${imporKini.catatan.length - 12} catatan lain.</li>` : ''}
+          </ul>
+        </div>` : ''}
+
+      <div class="kolom" style="max-width:430px;margin:16px 0 14px">
+        <label for="modeImpor">Cara memasukkan</label>
+        <select id="modeImpor">
+          <option value="tambah">Tambah / perbarui — butir lain tetap ada</option>
+          <option value="ganti">Ganti seluruh bank soal dengan daftar ini</option>
+        </select>
+      </div>
+
+      <div class="tabel-bungkus">
+        <table class="tabel tabel-impor">
+          <thead>
+            <tr><th>#</th><th>Pertanyaan &amp; pilihan</th><th>Kunci</th>
+                <th>Grup kembar</th><th>Pembahasan</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${d.map((s, i) => `
+              <tr>
+                <td class="peringkat-nomor">${i + 1}</td>
+                <td class="bebas">
+                  <div class="impor-tanya">${aman(s.q)}</div>
+                  <ol class="impor-opsi">${s.o.map(o => `<li>${aman(o)}</li>`).join('')}</ol>
+                </td>
+                <td>
+                  <select class="impor-kunci${s.a >= 0 ? '' : ' perlu-isi'}" data-n="${i}">
+                    <option value="-1"${s.a >= 0 ? '' : ' selected'}>— pilih —</option>
+                    ${s.o.map((o, n) => `<option value="${n}"${s.a === n ? ' selected' : ''}>${BENTUK[n]} ${'ABCD'[n]}</option>`).join('')}
+                  </select>
+                </td>
+                <td><input class="impor-grup" data-n="${i}" value="${aman(s.grup)}" placeholder="—" /></td>
+                <td class="bebas"><input class="impor-bahas" data-n="${i}" value="${aman(s.bahas)}" placeholder="opsional" /></td>
+                <td>${s.baru ? '<span class="tanda-baru">baru</span>' : 'sudah ada'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="ket-halaman" style="margin-top:10px">
+        Isi <b>Grup kembar</b> dengan kata yang sama pada dua butir yang menanyakan hal serupa
+        (mis. <span class="mono">format-pdf</span>); pengundian hanya memakai satu di antaranya,
+        jadi peserta tidak menemui soal kembar dalam satu lembar.
+      </p>
+      <div class="baris-tombol" style="margin-top:16px">
+        <button class="btn btn-biru" type="button" id="btnSimpanBank">Simpan ke bank soal</button>
+        <button class="btn btn-hantu" type="button" id="btnBatalImpor">Batal</button>
+      </div>`;
+
+    for (const el of kotak.querySelectorAll('.impor-kunci')) {
+      el.onchange = () => el.classList.toggle('perlu-isi', Number(el.value) < 0);
+    }
+
+    $('#btnBatalImpor').onclick = () => { imporKini = null; gambarPratinjauImpor(); };
+    $('#btnSimpanBank').onclick = () => simpanImpor();
+  }
+
+  async function simpanImpor() {
+    const kotak = $('#pratinjauBank');
+    const pesan = $('#pesanBank');
+    if (!imporKini || !kotak || !pesan) return;
+    const d = imporKini.soal;
+
+    // Suntingan panitia dibaca lebih dulu dari formulir pratinjau.
+    for (const el of kotak.querySelectorAll('.impor-kunci')) d[Number(el.dataset.n)].a = Number(el.value);
+    for (const el of kotak.querySelectorAll('.impor-grup')) d[Number(el.dataset.n)].grup = el.value.trim();
+    for (const el of kotak.querySelectorAll('.impor-bahas')) d[Number(el.dataset.n)].bahas = el.value.trim();
+
+    const belum = d.filter(s => !(s.a >= 0 && s.a < s.o.length));
+    if (belum.length) {
+      pesan.innerHTML = '<div class="pesan pesan-galat">Masih ada ' + belum.length +
+        ' butir tanpa kunci jawaban. Isi dulu kolom Kunci yang bertanda merah.</div>';
+      const pertama = kotak.querySelector('.impor-kunci.perlu-isi');
+      if (pertama) { pertama.scrollIntoView({ behavior: 'smooth', block: 'center' }); pertama.focus(); }
+      return;
+    }
+
+    const mode = ($('#modeImpor') || {}).value === 'ganti' ? 'ganti' : 'tambah';
+    const rapi = (s) => ({ id: s.id, q: s.q, o: s.o, a: s.a, bahas: s.bahas || '', grup: s.grup || '' });
+
+    let baru;
+    if (mode === 'ganti') {
+      baru = d.map(rapi);
+    } else {
+      // Butir dengan id yang sama ditimpa di tempatnya; sisanya ditambahkan
+      // di belakang, jadi urutan bank lama tidak berubah-ubah.
+      const dari = new Map(d.map(s => [s.id, rapi(s)]));
+      baru = BANK.map(s => dari.get(s.id) || rapi(s));
+      for (const s of d) if (!BANK.some(x => x.id === s.id)) baru.push(rapi(s));
+    }
+
+    const grup = new Set(baru.map(s => s.grup || s.id)).size;
+    if (grup < 5) {
+      pesan.innerHTML = '<div class="pesan pesan-galat">Bank soal minimal berisi 5 grup soal unik; ' +
+        'daftar ini hanya ' + grup + '. Pakai "Tambah / perbarui" alih-alih "Ganti".</div>';
+      return;
+    }
+    if (baru.length > 300) {
+      pesan.innerHTML = '<div class="pesan pesan-galat">Bank soal dibatasi 300 butir supaya ' +
+        'tetap muat dalam satu dokumen Firestore.</div>';
+      return;
+    }
+
+    const tombol = $('#btnSimpanBank');
+    tombol.disabled = true; tombol.textContent = 'Menyimpan…';
+    try {
+      const dok = await window.DB.simpanBank(baru, imporKini.sumber || 'impor');
+      pakaiBank(dok);
+      imporKini = null;
+      gambarBank();
+      sesiTergambar = null;
+      gambarKendaliSesi();
+      $('#pesanBank').innerHTML = '<div class="pesan pesan-info">Bank soal tersimpan — ' +
+        baru.length + ' butir, ' + grup + ' grup unik. Peserta yang masuk sesudah ini langsung memakainya.</div>';
+    } catch (e) {
+      console.error('[bank] gagal menyimpan bank soal:', e);
+      tombol.disabled = false; tombol.textContent = 'Simpan ke bank soal';
+      pesan.innerHTML = '<div class="pesan pesan-galat">Gagal menyimpan: ' + aman(e.code || e.message) +
+        '<br>Bila pesannya soal izin, pastikan blok <b>pretestBank</b> pada firestore.rules ' +
+        'sudah ditempel dan dipublikasikan di Firebase Console.</div>';
+    }
+  }
+
   /* ── 5h. Bantuan ─────────────────────────────────────────────── */
 
   function halamanBantuan() {
@@ -2031,9 +2404,16 @@
     if (berubah && location.hash === '#/admin') render();
   });
 
-  window.DB.init().then(mode => {
-    const pita = $('#pitaLokal');
-    if (pita) pita.hidden = mode !== 'lokal';
-    render();
-  });
+  window.DB.init()
+    .then(mode => {
+      const pita = $('#pitaLokal');
+      if (pita) pita.hidden = mode !== 'lokal';
+      // Bank soal hasil impor panitia dibaca sekali di awal; bila tidak ada
+      // (atau gagal dibaca), bank bawaan assets/soal.js yang dipakai.
+      return window.DB.ambilBank().catch(e => {
+        console.warn('[bank] gagal memuat bank soal impor:', e);
+        return null;
+      });
+    })
+    .then(dok => { pakaiBank(dok); render(); });
 })();

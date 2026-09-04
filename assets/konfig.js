@@ -37,7 +37,8 @@ window.KONFIG = {
     jenis: "pre",          // "pre" atau "post"
     judul: "Pre-Test BIMTEK eMonDAK Angkatan 1",
     token: "A7K2M9",       // 6 karakter; tombol "Acak" di Ruang Admin membuat yang baru
-    jumlahSoal: 20,        // maksimal 21 (grup soal unik di bank soal 24 butir)
+    jumlahSoal: 25,        // batas atasnya = jumlah grup soal unik di bank
+                           // (bank bawaan: 29 butir, 26 grup unik)
     detikPerSoal: 120,     // hitung mundur tiap butir — 2 menit per soal
     poinCepat: true,       // makin cepat menjawab, makin besar poin
     aktif: false           // dibuka dari Ruang Admin
@@ -51,6 +52,16 @@ window.KONFIG = {
   poinDasar: 600,   // poin untuk jawaban benar, seberapa pun lambatnya
   poinCepatMaks: 400, // tambahan maksimal bila menjawab seketika
   bonusBeruntun: 50,  // tambahan per jawaban benar beruntun (mulai ke-3)
+
+  // ── Bank soal ─────────────────────────────────────────────────────
+  // Bank bawaan ada di assets/soal.js dan ikut ter-deploy. Panitia boleh
+  // menimpanya dari Ruang Admin → "Bank soal": berkas .docx/.json/teks
+  // dibaca di peramban, dipratinjau, lalu disimpan ke Firestore
+  // (pretestBank/aktif) dan langsung dipakai semua peserta. Tidak ada
+  // pengaturannya di berkas ini.
+  //
+  // Tiap peserta mendapat undian sendiri: butir mana yang keluar, urutan
+  // soalnya, dan urutan pilihan A–D-nya semua diacak per peserta.
 
   // ── Akun panitia ──────────────────────────────────────────────────
   // Tidak ada pengaturannya di sini. Panitia memakai akun Firebase

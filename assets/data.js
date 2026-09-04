@@ -10,6 +10,7 @@
    Koleksi Firestore
      pretestAkun/{idAkun}   profil peserta (nama, email, instansi)
      pretestSesi/aktif      satu dokumen: jadwal & token sesi berjalan
+     pretestBank/aktif      bank soal hasil impor panitia (bila ada)
      pretestHasil/{auto}    nilai akhir tiap peserta
 
    Peserta tidak memakai akun Firebase sama sekali — mereka dikenali dari
@@ -22,6 +23,7 @@
   const KUNCI_HASIL = 'pretest_hasil_v1';
   const KUNCI_AKUN  = 'pretest_akun_v1';
   const KUNCI_SESI  = 'pretest_sesi_dok_v1';
+  const KUNCI_BANK  = 'pretest_bank_v1';
 
   const idAkun = (email) => String(email || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
@@ -260,6 +262,52 @@
       };
     },
 
+    /* ── BANK SOAL ─────────────────────────────────────────────────
+       Bank soal bawaan ada di assets/soal.js dan ikut ter-deploy.
+       Bila panitia mengimpor soal baru dari Ruang Admin, hasilnya
+       disimpan di sini dan MENIMPA bank bawaan untuk semua peserta —
+       jadi soal baru bisa dipakai tanpa deploy ulang. Menghapus
+       dokumen ini mengembalikan bank bawaan. */
+
+    async ambilBank() {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { doc, getDoc } = this._fs;
+        const cuplik = await getDoc(doc(this._db, 'pretestBank', 'aktif'));
+        return cuplik.exists() ? cuplik.data() : null;
+      }
+      return this._baca(KUNCI_BANK, null);
+    },
+
+    // daftar = larik butir soal { id, q, o[4], a, bahas, grup }
+    async simpanBank(daftar, sumber) {
+      await this.init();
+      const isi = {
+        soal: daftar,
+        jumlah: daftar.length,
+        sumber: sumber || 'impor',
+        diubah: new Date().toISOString()
+      };
+      if (this.mode === 'firebase') {
+        const { doc, setDoc } = this._fs;
+        await setDoc(doc(this._db, 'pretestBank', 'aktif'), isi);
+      } else {
+        this._tulis(KUNCI_BANK, isi);
+      }
+      return isi;
+    },
+
+    // Kembali memakai bank bawaan assets/soal.js.
+    async hapusBank() {
+      await this.init();
+      if (this.mode === 'firebase') {
+        const { doc, deleteDoc } = this._fs;
+        await deleteDoc(doc(this._db, 'pretestBank', 'aktif'));
+        return;
+      }
+      localStorage.removeItem(KUNCI_BANK);
+    },
+
     /* ── HASIL ─────────────────────────────────────────────────── */
 
     async simpan(rec) {
@@ -351,6 +399,7 @@
     kosongkanLokal() {
       localStorage.removeItem(KUNCI_HASIL);
       localStorage.removeItem(KUNCI_SESI);
+      localStorage.removeItem(KUNCI_BANK);
     }
   };
 

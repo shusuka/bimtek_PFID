@@ -43,7 +43,8 @@ pada jendela waktu yang dibuka panitia.
 | `assets/style.css` | Seluruh gaya tampilan: tema terang, ubin jawaban, animasi |
 | `assets/konfig.js` | Jenis tes, nilai bawaan sesi, dan rumus poin |
 | `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
-| `assets/soal.js` | Bank soal 24 butir dari berkas .docx penyelenggara |
+| `assets/soal.js` | Bank soal bawaan, 29 butir dari berkas .docx penyelenggara |
+| `assets/impor-soal.js` | Pembaca .docx/.json/teks untuk impor soal dari Ruang Admin |
 | `assets/data.js` | Lapisan penyimpanan: Firestore atau localStorage |
 | `assets/xlsx.js` | Penulis berkas `.xlsx` untuk rekap Excel (tanpa pustaka luar) |
 | `assets/app.js` | Perute halaman, kuis, papan peringkat, ruang admin |
@@ -127,18 +128,24 @@ tidak diganti.
 
 ## Membersihkan data sebelum angkatan berikutnya
 
-Di bagian **Pembersihan data** pada Ruang Admin ada tiga tombol:
+Di bagian **Pembersihan data** pada Ruang Admin ada empat tombol:
 
-| Tombol | Yang dihapus | Yang tetap utuh |
-| --- | --- | --- |
-| Hapus semua akun peserta | Seluruh isi `pretestAkun` | Semua nilai yang sudah masuk |
-| Hapus hasil sesi ini | Nilai pada kode sesi yang sedang aktif | Akun peserta & sesi lain |
-| Hapus seluruh riwayat hasil | Seluruh isi `pretestHasil` | Akun peserta |
+| Tombol | Yang dihapus | Yang tetap utuh | Kata kunci |
+| --- | --- | --- | --- |
+| **Reset masa uji coba** | Seluruh `pretestAkun` **dan** seluruh `pretestHasil` | Pengaturan sesi & bank soal | `saya akan lawan` |
+| Hapus akun peserta saja | Seluruh isi `pretestAkun` | Semua nilai yang sudah masuk | `saya akan lawan` |
+| Hapus hasil sesi ini | Nilai pada kode sesi yang sedang aktif | Akun peserta & sesi lain | `HAPUS` |
+| Hapus seluruh riwayat hasil | Seluruh isi `pretestHasil` | Akun peserta | `HAPUS SEMUA` |
 
-Ketiganya meminta konfirmasi **dua kali**: kotak "yakin?" lalu mengetik ulang
-kata `HAPUS` (atau `HAPUS SEMUA` untuk yang terakhir). Tidak ada pembatalan
-sesudahnya. Peserta yang akunnya dihapus cukup mendaftar ulang dengan email yang
-sama.
+Keempatnya meminta konfirmasi **dua kali**: kotak "yakin?" lalu mengetik ulang
+kata kuncinya. Pengetikannya tidak peka huruf besar/kecil maupun spasi berlebih.
+Tidak ada pembatalan sesudahnya.
+
+**Reset masa uji coba** adalah tombol yang dipakai selama pengujian: sesudahnya
+orang yang sama bisa mendaftar lagi dan mengerjakan lagi dari nol, karena akun
+sekaligus nilainya sudah bersih. Tiga tombol lain bekerja sendiri-sendiri —
+menghapus akun tidak menghapus nilai, dan sebaliknya. Peserta yang akunnya
+dihapus cukup mendaftar ulang dengan email yang sama.
 
 ---
 
@@ -195,6 +202,7 @@ Koleksinya:
 | --- | --- |
 | `pretestAkun/{idAkun}` | profil peserta — nama, email, pemda, provinsi |
 | `pretestSesi/aktif` | jenis tes, jadwal, & token sesi yang sedang berjalan |
+| `pretestBank/aktif` | bank soal hasil impor panitia — menimpa `assets/soal.js` |
 | `pretestHasil/{auto}` | nilai akhir tiap peserta, termasuk waktu tiap butir soal |
 
 Tiap rekaman di `pretestHasil` menyimpan larik `jawaban`, satu entri per butir
@@ -255,18 +263,79 @@ itu tidak pernah tersimpan di repo maupun di berkas mana pun.
 
 ## Bank soal
 
-24 butir dari `SOAL PRE TEST EMONDAK New.docx` (revisi penyelenggara 2 September
-2026, menggantikan `DAFTAR PERTANYAAN PRE & POST TEST BIMTEK EMONDAK.docx`).
+**29 butir bawaan**: 24 butir eMonDAK dari `SOAL PRE TEST EMONDAK New.docx`
+ditambah 5 butir anti korupsi dari revisi 4 September 2026 (bagian "PERTANYAAN
+SOAL ANTI KORUPSI", dalam rangka Pembangunan Zona Integritas).
+
 Tiga pasang di antaranya menanyakan hal yang sama dengan redaksi berbeda (format
 PDF, adendum, format nilai kontrak), jadi tiap pasangan diberi penanda `grup` dan
 pengundian hanya mengambil satu wakil per grup — peserta tidak akan menemui soal
-kembar. Tersisa **21 grup unik**, dan jumlah soal per sesi tidak boleh melebihi
-angka itu.
+kembar dalam satu lembar. Tersisa **26 grup unik**, dan jumlah soal per sesi
+tidak boleh melebihi angka itu. Bawaannya kini **25 soal per peserta**.
 
-`id` tiap butir (`p01`…`p25`) **jangan diubah** setelah ada nilai masuk, karena
-dipakai menyusun ulang pembahasan dan analisis butir soal. `p14` sudah dibuang
-pada revisi ini (kembarannya hilang dari dokumen baru) dan nomornya **tidak
-dipakai ulang** — butir baru harus memakai `p26` dan seterusnya.
+`id` tiap butir **jangan diubah** setelah ada nilai masuk, karena dipakai
+menyusun ulang pembahasan dan analisis butir soal. `p14` sudah dibuang pada
+revisi 2 September (kembarannya hilang dari dokumen baru) dan nomornya **tidak
+dipakai ulang** — butir eMonDAK baru memakai `p26` dan seterusnya, butir anti
+korupsi memakai `k01`…, dan butir hasil impor mendapat `i…` otomatis.
+
+### Semuanya diacak per peserta
+
+Tiap peserta mendapat lembar sendiri, diundi saat tokennya diterima:
+
+1. **butir mana yang keluar** — satu wakil acak per grup, lalu dipotong sebanyak
+   jumlah soal sesi;
+2. **urutan soalnya**; dan
+3. **urutan pilihan A–D pada tiap soal** — kuncinya disimpan sebagai indeks pada
+   urutan asli dokumen, jadi pengacakan tampilan tidak pernah menggeser kunci.
+
+Dua peserta yang duduk bersebelahan tidak akan melihat layar yang sama.
+
+### Impor soal baru dari Ruang Admin
+
+Penyelenggara kerap mengirim revisi soal beberapa jam sebelum kelas. Kartu
+**Bank soal** di Ruang Admin memasukkannya tanpa deploy ulang:
+
+| Sumber | Keterangan |
+| --- | --- |
+| `.docx` | Dokumen Word kiriman penyelenggara — dibongkar di peramban panitia (ZIP + inflate bawaan), tidak diunggah ke mana pun |
+| `.json` | Cadangan yang pernah diunduh lewat tombol **Unduh cadangan (JSON)** |
+| teks | Disalin-tempel ke kotak pada kartu itu, atau berkas `.txt`/`.csv` |
+
+Dua tata tulis dipahami, dan boleh bercampur dalam satu berkas:
+
+```
+Bagaimana cara mengakses eMonDAK?        1. Dasar hukum korupsi
+[✔] A. Lewat Portal FID > eMonDAK        UU Tipikor rujukan utamanya adalah…
+[ ] B. Lewat Portal FID > SIPDJD         A. UU 31/1999 jo. UU 20/2001
+[ ] C. Lewat Play Store                  B. UU 5/2014
+[ ] D. Lewat surat resmi                 Jawaban benar: A
+```
+
+Pilihan yang menyatu dalam satu baris (`A. satu B. dua C. tiga`) ikut dipecah —
+Word kerap menggabungkannya saat teks disalin. Judul bagian yang huruf besar
+semua dan label bernomor seperti "1. Dasar hukum korupsi" tidak ikut terbawa
+menjadi pertanyaan.
+
+Hasil bacaan **tidak langsung disimpan**. Yang muncul lebih dulu adalah
+pratinjau yang masih bisa dibetulkan:
+
+- **Kunci** — kunci yang tidak terbaca ditandai merah dan wajib dipilih dulu;
+- **Grup kembar** — isi kata yang sama pada dua butir yang menanyakan hal serupa;
+- **Pembahasan** — kalimat yang muncul di halaman hasil peserta.
+
+Butir yang teks pertanyaannya sudah ada di bank memakai **id lamanya kembali**,
+jadi rekap butir dan pembahasan nilai yang telanjur masuk tidak putus. Pilih
+**Tambah / perbarui** untuk menimpa butir yang sama sambil menyimpan sisanya,
+atau **Ganti seluruh bank soal** untuk memulai dari nol.
+
+Hasilnya tersimpan di `pretestBank/aktif` dan langsung dipakai peserta yang
+masuk sesudahnya. Bank di `assets/soal.js` tetap utuh sebagai cadangan, dan
+tombol **Kembalikan ke bank bawaan** memulihkannya kapan saja.
+
+> Aturan `pretestBank` pada `firestore.rules` harus sudah ditempel dan
+> dipublikasikan di Firebase Console; tanpa itu penyimpanan ditolak dengan pesan
+> soal izin.
 
 ---
 

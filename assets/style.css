@@ -897,6 +897,34 @@ table.tabel tfoot td {
 .tombol-hapus:hover { border-color: var(--salah); color: var(--salah); background: rgba(203, 32, 51, .08); }
 .tombol-hapus:disabled { opacity: .4; cursor: not-allowed; }
 
+/* ── pratinjau impor bank soal ── */
+table.tabel-impor { min-width: 900px; }
+table.tabel-impor td { vertical-align: top; }
+.impor-tanya { font-weight: 600; color: var(--navy); white-space: normal; max-width: 460px; }
+.impor-opsi {
+  margin: 6px 0 0; padding-left: 18px;
+  font-size: 13px; color: var(--teks-samar); white-space: normal; max-width: 460px;
+}
+.impor-opsi li { margin: 2px 0; }
+.tabel-impor select, .tabel-impor input {
+  padding: 7px 9px; border-radius: 7px;
+  border: 1px solid var(--garis-kuat); background: #ffffff;
+  color: var(--teks); font-family: var(--font); font-size: 13.5px;
+}
+.tabel-impor select { min-width: 92px; }
+.tabel-impor .impor-grup { width: 130px; }
+.tabel-impor .impor-bahas { width: 260px; }
+.tabel-impor select:focus, .tabel-impor input:focus {
+  outline: none; border-color: var(--biru); box-shadow: 0 0 0 3px rgba(31, 111, 208, .16);
+}
+/* Kunci jawaban yang tidak terbaca dari dokumen — wajib dipilih panitia. */
+.tabel-impor select.perlu-isi { border-color: var(--salah); background: rgba(203, 32, 51, .06); }
+.tanda-baru {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  background: rgba(31, 111, 208, .12); color: var(--biru);
+  font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+}
+
 /* ── kartu pembersihan data ── */
 .kartu-bahaya {
   border-color: rgba(203, 32, 51, .30);

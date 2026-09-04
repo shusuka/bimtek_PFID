@@ -6,6 +6,7 @@ rules_version = '2';
 // Koleksi yang dipakai
 //   pretestAkun/{idAkun}    profil peserta (nama, email, pemda)
 //   pretestSesi/aktif       jadwal & token sesi yang sedang berjalan
+//   pretestBank/aktif       bank soal hasil impor panitia (bila ada)
 //   pretestHasil/{auto}     nilai akhir tiap peserta
 //
 // ───────────────────────────────────────────────────────────────────────────
@@ -67,6 +68,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── bank soal ───────────────────────────────────────────────────────
+    // Dibaca semua orang: peserta memerlukannya untuk menampilkan soal.
+    // Ditulis hanya panitia, lewat Ruang Admin → "Bank soal". Dokumen ini
+    // menimpa bank bawaan assets/soal.js; menghapusnya mengembalikan bank
+    // bawaan. Batas 1 MiB per dokumen Firestore = ribuan butir, jauh di
+    // atas kebutuhan; aplikasi sendiri membatasi 300 butir.
+    match /pretestBank/{id} {
+      allow read: if true;
+
+      // create/update dan delete dipisah: pada delete tidak ada
+      // request.resource, jadi pemeriksaan isinya hanya berlaku saat menulis.
+      allow create, update: if isAdmin()
+        && request.resource.data.soal is list
+        && request.resource.data.soal.size() > 0
+        && request.resource.data.soal.size() <= 300;
+
+      allow delete: if isAdmin();
+    }
+
     // ── akun peserta ────────────────────────────────────────────────────
     // Dibuat sendiri oleh peserta saat mendaftar; boleh diperbarui bila
     // instansinya berubah. Menghapus hanya boleh oleh panitia.
@@ -120,7 +140,7 @@ service cloud.firestore {
 
         && request.resource.data.total is int
         && request.resource.data.total > 0
-        && request.resource.data.total <= 30
+        && request.resource.data.total <= 60
         && request.resource.data.benar is int
         && request.resource.data.benar >= 0
         && request.resource.data.benar <= request.resource.data.total

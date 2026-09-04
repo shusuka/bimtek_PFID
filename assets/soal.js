@@ -3,11 +3,18 @@
    Sumber : "SOAL PRE TEST EMONDAK New.docx" (revisi penyelenggara,
             2 September 2026) — menggantikan "DAFTAR PERTANYAAN PRE &
             POST TEST BIMTEK EMONDAK" yang dipakai sebelumnya.
-   Jumlah : 24 butir. Tiga pasang di antaranya menanyakan hal yang
-            sama dengan redaksi berbeda, jadi tiap pasangan diberi
-            penanda `grup` yang sama; pengundian hanya mengambil SATU
-            butir dari tiap grup supaya peserta tidak menemui soal
-            kembar dalam satu sesi — kolam efektifnya 21 grup unik.
+   Jumlah : 29 butir — 24 butir eMonDAK ditambah 5 butir anti korupsi
+            (revisi penyelenggara 4 September 2026). Tiga pasang di
+            antaranya menanyakan hal yang sama dengan redaksi berbeda,
+            jadi tiap pasangan diberi penanda `grup` yang sama;
+            pengundian hanya mengambil SATU butir dari tiap grup supaya
+            peserta tidak menemui soal kembar dalam satu sesi — kolam
+            efektifnya 26 grup unik, cukup untuk 25 soal per peserta.
+
+            Ini bank soal BAWAAN. Panitia boleh menimpanya dari Ruang
+            Admin → "Bank soal" (impor .docx/.json/tempel teks) tanpa
+            deploy ulang; hasil impornya tersimpan di Firestore pada
+            pretestBank/aktif dan langsung dipakai semua peserta.
    Format : id    = kode tetap, JANGAN diubah setelah ada nilai masuk
                     (dipakai menyusun ulang pembahasan & analisis butir)
             q     = pertanyaan
@@ -207,5 +214,51 @@ window.SOAL_PRETEST = [
         "Nama lengkap seluruh tukang bangunan",
         "Besar gaji harian mandor",
         "Daftar hadir PNS di dinas"], a: 0,
-    bahas: "Yang dilaporkan adalah jumlah tenaga kerja lokal yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." }
+    bahas: "Yang dilaporkan adalah jumlah tenaga kerja lokal yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." },
+
+  /* ── Bagian anti korupsi ───────────────────────────────────────────
+     Sumber : "SOAL PRE TEST EMONDAK New (1).docx" — bagian "PERTANYAAN
+              SOAL ANTI KORUPSI", ditambahkan penyelenggara dalam rangka
+              Pembangunan Zona Integritas di lingkungan PFID.
+     ────────────────────────────────────────────────────────────────── */
+
+  { id: "k01",
+    q: "UU Tipikor yang tetap menjadi rujukan utama, dengan beberapa ketentuan telah disesuaikan dalam KUHP Nasional, adalah…",
+    o: ["UU Nomor 31 Tahun 1999 yang diubah dengan UU Nomor 20 Tahun 2001",
+        "UU Nomor 5 Tahun 2014",
+        "UU Nomor 25 Tahun 2009",
+        "UU Nomor 14 Tahun 2008"], a: 0,
+    bahas: "Dasar hukum pemberantasan korupsi adalah UU 31/1999 sebagaimana diubah dengan UU 20/2001; sebagian ketentuannya kini disesuaikan dalam KUHP Nasional." },
+
+  { id: "k02",
+    q: "Manakah yang termasuk tujuh kelompok tindak pidana korupsi?",
+    o: ["Suap-menyuap, pemerasan, dan gratifikasi",
+        "Keterlambatan, ketidakhadiran, dan pemborosan",
+        "Pelanggaran parkir, kecelakaan, dan pencemaran",
+        "Perselisihan, kelalaian, dan kesalahan ketik"], a: 0,
+    bahas: "Tujuh kelompoknya: kerugian keuangan negara, suap-menyuap, penggelapan dalam jabatan, pemerasan, perbuatan curang, benturan kepentingan dalam pengadaan, dan gratifikasi." },
+
+  { id: "k03",
+    q: "Pengusaha menawarkan uang kepada pejabat agar memenangkan tender. Perbuatan ini termasuk…",
+    o: ["Suap",
+        "Gratifikasi yang boleh diterima",
+        "Hadiah biasa",
+        "Sumbangan sosial"], a: 0,
+    bahas: "Ada maksud memengaruhi keputusan jabatan, jadi perbuatan itu suap — bukan hadiah dan bukan gratifikasi yang boleh diterima." },
+
+  { id: "k04",
+    q: "Menurut Peraturan KPK terbaru, berapa batas nilai kado pernikahan yang tidak wajib dilaporkan dari setiap pemberi?",
+    o: ["Maksimal Rp1.500.000",
+        "Maksimal Rp5.000.000",
+        "Maksimal Rp10.000.000",
+        "Tidak ada batas nilai"], a: 0,
+    bahas: "Kado pernikahan sampai Rp1.500.000 dari tiap pemberi dikecualikan dari kewajiban lapor; selebihnya tetap wajib dilaporkan ke KPK." },
+
+  { id: "k05",
+    q: "Rekan kerja memberi hadiah ulang tahun. Agar tidak wajib dilaporkan menurut aturan terbaru, ketentuan yang tepat adalah…",
+    o: ["Bukan uang/alat tukar, maksimal Rp500.000 per pemberian, dan total Rp1.500.000 setahun dari pemberi yang sama",
+        "Boleh berupa uang maksimal Rp2.000.000",
+        "Boleh berapa pun selama diberikan di kantor",
+        "Harus selalu diterima agar tidak menyinggung pemberi"], a: 0,
+    bahas: "Pengecualian hadiah antar rekan kerja dibatasi tiga syarat sekaligus: bukan uang, maksimal Rp500.000 sekali beri, dan tidak lebih dari Rp1.500.000 setahun dari pemberi yang sama." }
 ];
