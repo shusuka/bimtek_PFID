@@ -43,7 +43,7 @@ pada jendela waktu yang dibuka panitia.
 | `assets/style.css` | Seluruh gaya tampilan: tema terang, ubin jawaban, animasi |
 | `assets/konfig.js` | Jenis tes, nilai bawaan sesi, dan rumus poin |
 | `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
-| `assets/soal.js` | Bank soal bawaan, 29 butir dari berkas .docx penyelenggara |
+| `assets/soal.js` | Bank soal bawaan, 25 butir dari berkas .docx penyelenggara |
 | `assets/impor-soal.js` | Pembaca .docx/.json/teks untuk impor soal dari Ruang Admin |
 | `assets/data.js` | Lapisan penyimpanan: Firestore atau localStorage |
 | `assets/xlsx.js` | Penulis berkas `.xlsx` untuk rekap Excel (tanpa pustaka luar) |
@@ -263,19 +263,19 @@ itu tidak pernah tersimpan di repo maupun di berkas mana pun.
 
 ## Bank soal
 
-**29 butir bawaan**: 24 butir eMonDAK dari `SOAL PRE TEST EMONDAK New.docx`
-ditambah 5 butir anti korupsi dari revisi 4 September 2026 (bagian "PERTANYAAN
-SOAL ANTI KORUPSI", dalam rangka Pembangunan Zona Integritas).
+**25 butir bawaan** dari `22 September 2022 SOAL PRE TEST EMONDAK New.docx`
+(revisi penyelenggara 22 September 2026): 20 butir eMonDAK ditambah 5 butir anti
+korupsi (bagian "PERTANYAAN SOAL ANTI KORUPSI", dalam rangka Pembangunan Zona
+Integritas).
 
-Tiga pasang di antaranya menanyakan hal yang sama dengan redaksi berbeda (format
-PDF, adendum, format nilai kontrak), jadi tiap pasangan diberi penanda `grup` dan
-pengundian hanya mengambil satu wakil per grup — peserta tidak akan menemui soal
-kembar dalam satu lembar. Tersisa **26 grup unik**, dan jumlah soal per sesi
-tidak boleh melebihi angka itu. Bawaannya kini **25 soal per peserta**.
+Revisi ini membuang soal kembar dan soal kompresi PDF (`p15`, `p17`, `p19`,
+`p23`), jadi tidak ada lagi butir yang memakai `grup`. Dengan **25 soal per
+peserta**, seluruh bank keluar untuk tiap peserta; yang diacak hanya urutan soal
+dan pilihannya.
 
 `id` tiap butir **jangan diubah** setelah ada nilai masuk, karena dipakai
-menyusun ulang pembahasan dan analisis butir soal. `p14` sudah dibuang pada
-revisi 2 September (kembarannya hilang dari dokumen baru) dan nomornya **tidak
+menyusun ulang pembahasan dan analisis butir soal. `p14`, `p15`, `p17`, `p19`,
+dan `p23` sudah dibuang oleh revisi penyelenggara dan nomornya **tidak
 dipakai ulang** — butir eMonDAK baru memakai `p26` dan seterusnya, butir anti
 korupsi memakai `k01`…, dan butir hasil impor mendapat `i…` otomatis.
 

@@ -38,7 +38,7 @@ window.KONFIG = {
     judul: "Pre-Test BIMTEK eMonDAK Angkatan 1",
     token: "A7K2M9",       // 6 karakter; tombol "Acak" di Ruang Admin membuat yang baru
     jumlahSoal: 25,        // batas atasnya = jumlah grup soal unik di bank
-                           // (bank bawaan: 29 butir, 26 grup unik)
+                           // (bank bawaan: 25 butir, tanpa soal kembar)
     detikPerSoal: 120,     // hitung mundur tiap butir — 2 menit per soal
     poinCepat: true,       // makin cepat menjawab, makin besar poin
     aktif: false           // dibuka dari Ruang Admin

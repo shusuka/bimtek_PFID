@@ -1,15 +1,13 @@
 /* ══════════════════════════════════════════════════════════════════
    BANK SOAL — EVALUASI PEMAHAMAN OPERATOR eMonitoring DAK
-   Sumber : "SOAL PRE TEST EMONDAK New.docx" (revisi penyelenggara,
-            2 September 2026) — menggantikan "DAFTAR PERTANYAAN PRE &
-            POST TEST BIMTEK EMONDAK" yang dipakai sebelumnya.
-   Jumlah : 29 butir — 24 butir eMonDAK ditambah 5 butir anti korupsi
-            (revisi penyelenggara 4 September 2026). Tiga pasang di
-            antaranya menanyakan hal yang sama dengan redaksi berbeda,
-            jadi tiap pasangan diberi penanda `grup` yang sama;
-            pengundian hanya mengambil SATU butir dari tiap grup supaya
-            peserta tidak menemui soal kembar dalam satu sesi — kolam
-            efektifnya 26 grup unik, cukup untuk 25 soal per peserta.
+   Sumber : "22 September 2022 SOAL PRE TEST EMONDAK New.docx" (revisi
+            penyelenggara, 22 September 2026) — menggantikan bank 29
+            butir dari "SOAL PRE TEST EMONDAK New (1).docx".
+   Jumlah : 25 butir — 20 butir eMonDAK ditambah 5 butir anti korupsi.
+            Soal kembar sudah dibuang penyelenggara (p15, p17, p19, p23
+            tidak ada lagi di dokumen), jadi 25 soal per peserta berarti
+            seluruh bank keluar, hanya urutannya yang diacak. Nomor yang
+            dibuang JANGAN dipakai ulang; butir baru mulai p26.
 
             Ini bank soal BAWAAN. Panitia boleh menimpanya dari Ruang
             Admin → "Bank soal" (impor .docx/.json/tempel teks) tanpa
@@ -21,7 +19,7 @@
             o     = opsi pada urutan asli dokumen [A, B, C, D]
             a     = indeks opsi yang benar pada urutan asli (0 = A)
             bahas = penjelasan singkat yang muncul di halaman hasil
-            grup  = penanda soal kembar (boleh kosong)
+            grup  = penanda soal kembar (opsional; bank ini tidak memakainya)
    ══════════════════════════════════════════════════════════════════ */
 window.SOAL_PRETEST = [
   { id: "p01",
@@ -66,7 +64,7 @@ window.SOAL_PRETEST = [
 
   { id: "p06",
     q: "Fitur bantuan apa yang disediakan di dalam aplikasi untuk terhubung langsung dengan pusat jika operator menemui kendala atau error?",
-    o: ["Tombol (Button) Helpdesk via WhatsApp",
+    o: ["Button Helpdesk via WhatsApp",
         "Kolom komentar publik",
         "Surat fisik ke kantor",
         "Call center darurat"], a: 0,
@@ -104,7 +102,7 @@ window.SOAL_PRETEST = [
         "25%, 50%, 75%, dan 100%"], a: 0,
     bahas: "Dokumentasi wajib diambil dari titik yang sama pada tiga tahap: 0%, 50%, dan 100%." },
 
-  { id: "p11", grup: "format-pdf",
+  { id: "p11",
     q: "Format file apa yang diwajibkan oleh sistem untuk dokumen lampiran seperti Kontrak, DED, dan RAB?",
     o: ["PDF (.pdf)",
         "Word (.doc)",
@@ -120,21 +118,13 @@ window.SOAL_PRETEST = [
         "Estimasi/tebakan kontraktor"], a: 0,
     bahas: "Realisasi keuangan adalah uang yang benar-benar cair, dibuktikan dengan SP2D — bukan rencana atau perkiraan." },
 
-  { id: "p13", grup: "adendum",
+  { id: "p13",
     q: "Jika terjadi perubahan desain atau volume pekerjaan (adendum), dokumen apa yang wajib diunggah?",
     o: ["Justifikasi Teknis",
         "Kuitansi toko",
         "Surat Izin Usaha",
         "Foto lokasi baru"], a: 0,
     bahas: "Setiap adendum harus disertai Justifikasi Teknis sebagai dasar perubahan desain atau volume." },
-
-  { id: "p15",
-    q: "Jika dokumen PDF DED yang akan diunggah ukurannya 30 MB (melebihi batas sistem), apa langkah yang harus dilakukan?",
-    o: ["Mengompresi file PDF (PDF Compressor) menjadi ukuran yang lebih kecil",
-        "Menghapus seluruh gambar dalam dokumen",
-        "Mengirim file lewat pos",
-        "Memotret layar komputer"], a: 0,
-    bahas: "Berkas dikecilkan dengan alat kompresi PDF tanpa mengubah isinya, lalu diunggah ulang." },
 
   { id: "p16",
     q: "Fitur apa yang digunakan untuk melaporkan manfaat atau fungsi infrastruktur yang dibangun pada tahun sebelumnya?",
@@ -144,14 +134,6 @@ window.SOAL_PRETEST = [
         "Profil Pengguna"], a: 0,
     bahas: "Menu Output & Immediate Outcome merekam manfaat bangunan tahun sebelumnya, bukan progres tahun berjalan." },
 
-  { id: "p17", grup: "format-pdf",
-    q: "Format file apakah yang diwajibkan oleh sistem saat Anda menggunakan fitur “Unggah Dokumen Kontrak”?",
-    o: ["PDF (.pdf)",
-        "Word (.doc)",
-        "Excel (.xls)",
-        "Gambar (.jpg)"], a: 0,
-    bahas: "Dokumen kontrak diunggah dalam format PDF." },
-
   { id: "p18",
     q: "Jika suatu paket pekerjaan dijalankan secara Swakelola, dokumen apa yang diunggah pada kolom Dokumen Kontrak?",
     o: ["SK Tim Pengelola Swakelola / SPK Swakelola",
@@ -159,14 +141,6 @@ window.SOAL_PRETEST = [
         "Foto gotong royong",
         "Dikosongkan saja"], a: 0,
     bahas: "Pekerjaan swakelola tetap punya dasar hukum pelaksanaan: SK Tim Pengelola atau SPK Swakelola yang diunggah di kolom dokumen kontrak." },
-
-  { id: "p19", grup: "adendum",
-    q: "Kolom dokumen apa yang wajib diisi dan diunggah pada sistem apabila terjadi perubahan desain atau volume pekerjaan di lapangan (adendum)?",
-    o: ["Kolom Justifikasi Teknis (Adendum)",
-        "Kolom DED",
-        "Kolom SPK",
-        "Kolom Berita Acara Rapat"], a: 0,
-    bahas: "Perubahan desain atau volume diunggah pada kolom Justifikasi Teknis (Adendum)." },
 
   { id: "p20",
     q: "Apa fungsi utama tombol “Simpan” (Save) setelah mengetik angka progres di aplikasi?",
@@ -176,7 +150,7 @@ window.SOAL_PRETEST = [
         "Keluar dari aplikasi"], a: 0,
     bahas: "Angka yang diketik belum masuk basis data sampai tombol Simpan ditekan; berpindah halaman tanpa menyimpan membuat isian hilang." },
 
-  { id: "p21", grup: "format-nilai",
+  { id: "p21",
     q: "Dalam penulisan angka Nilai Kontrak di sistem, bagaimana format yang benar?",
     o: ["Mengetik nominal angka pasti tanpa spasi/titik (contoh: 1500000)",
         "Menggunakan huruf (contoh: Satu Juta Rupiah)",
@@ -192,14 +166,6 @@ window.SOAL_PRETEST = [
         "Tim Verifikator Pusat"], a: 0,
     bahas: "Data yang diunggah adalah pernyataan resmi pemerintah daerah; pusat memverifikasi, tetapi tanggung jawab kebenarannya tetap pada Pemda." },
 
-  { id: "p23", grup: "format-nilai",
-    q: "Dalam fitur pengisian Nilai Kontrak, bagaimana format penulisan angka yang benar di dalam sistem?",
-    o: ["Mengetik nominal angka pasti tanpa spasi atau titik (contoh: 1500000)",
-        "Menggunakan huruf (contoh: Satu Juta Rupiah)",
-        "Dibulatkan ke angka terdekat",
-        "Diisi angka 0 terlebih dahulu"], a: 0,
-    bahas: "Nilai kontrak diketik sebagai angka polos, sesuai nominal pada dokumen kontrak." },
-
   { id: "p24",
     q: "Apabila kegiatan fisik di lapangan sudah selesai 100%, dokumen apakah yang wajib diunggah ke dalam sistem?",
     o: ["PHO / BAST (Berita Acara Serah Terima)",
@@ -210,11 +176,11 @@ window.SOAL_PRETEST = [
 
   { id: "p25",
     q: "Pada sub-menu “Data Tenaga Kerja”, data utama apakah yang wajib dilaporkan oleh operator daerah?",
-    o: ["Jumlah tenaga kerja lokal yang terserap pada kegiatan tersebut",
+    o: ["Jumlah tenaga kerja yang terserap pada kegiatan tersebut",
         "Nama lengkap seluruh tukang bangunan",
         "Besar gaji harian mandor",
         "Daftar hadir PNS di dinas"], a: 0,
-    bahas: "Yang dilaporkan adalah jumlah tenaga kerja lokal yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." },
+    bahas: "Yang dilaporkan adalah jumlah tenaga kerja yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." },
 
   /* ── Bagian anti korupsi ───────────────────────────────────────────
      Sumber : "SOAL PRE TEST EMONDAK New (1).docx" — bagian "PERTANYAAN
