@@ -29,6 +29,28 @@ window.KONFIG = {
   // memakai video, isi alamat .mp4 di bawah ini.
   videoHero: "",
 
+  // ── Contoh soal di beranda ────────────────────────────────────────
+  // Kartu contoh di beranda SENGAJA memakai soal pengetahuan umum, bukan
+  // bank soal ujian, supaya soal yang akan dikerjakan tidak terlihat
+  // sebelum sesi dibuka. a = indeks jawaban benar (0 = pilihan pertama);
+  // ikon = nama ilustrasi dari assets/ikon-soal.js.
+  soalContohBeranda: [
+    { q: "Planet terbesar di tata surya kita adalah…",
+      o: ["Jupiter", "Saturnus", "Neptunus", "Bumi"], a: 0, ikon: "umum" },
+    { q: "Hari Kemerdekaan Republik Indonesia diperingati setiap tanggal…",
+      o: ["17 Agustus", "1 Juni", "28 Oktober", "10 November"], a: 0, ikon: "kalender" },
+    { q: "Jembatan Suramadu menghubungkan Pulau Jawa dengan pulau…",
+      o: ["Madura", "Bali", "Sumatra", "Kalimantan"], a: 0, ikon: "jembatan" },
+    { q: "Mata uang resmi Negara Kesatuan Republik Indonesia adalah…",
+      o: ["Rupiah", "Ringgit", "Baht", "Peso"], a: 0, ikon: "uang" },
+    { q: "Berapa jumlah provinsi di Indonesia saat ini?",
+      o: ["38", "34", "36", "37"], a: 0, ikon: "gedung" },
+    { q: "Satu kilometer sama dengan berapa meter?",
+      o: ["1.000 meter", "100 meter", "10.000 meter", "500 meter"], a: 0, ikon: "angka" },
+    { q: "Lagu kebangsaan “Indonesia Raya” diciptakan oleh…",
+      o: ["W.R. Supratman", "Ismail Marzuki", "Cornel Simanjuntak", "Kusbini"], a: 0, ikon: "umum" }
+  ],
+
   // ── Nilai bawaan sesi baru ────────────────────────────────────────
   // Dipakai saat Ruang Admin membuat sesi pertama kali; sesudah itu
   // yang berlaku adalah isi Firestore.

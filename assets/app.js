@@ -423,8 +423,10 @@
     window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   /* ── Beranda: status sesi + kartu contoh soal ─────────────────────
-     Kartu di sisi kanan beranda memutar beberapa soal asli dari bank
-     beserta ikonnya, supaya calon peserta langsung tahu bentuk ujiannya.
+     Kartu di sisi kanan beranda memutar soal PENGETAHUAN UMUM dari
+     KONFIG.soalContohBeranda, supaya calon peserta tahu bentuk ujiannya
+     tanpa melihat soal ujian yang sesungguhnya. Jangan diganti ke BANK:
+     halaman ini terbuka untuk siapa saja sebelum sesi dimulai.
      Hanya berjalan selama beranda terbuka dan tab terlihat. */
 
   let demoId = null;
@@ -454,28 +456,23 @@
 
     const kartu = $('#demoKartu');
     if (!kartu || !window.IkonSoal) return;
-    // Satu soal per ikon, supaya tiap putaran memperlihatkan gambar berbeda.
-    const dipakai = new Set();
-    const contoh = BANK.filter((s) => {
-      const k = window.IkonSoal.kunci(s);
-      if (dipakai.has(k)) return false;
-      dipakai.add(k);
-      return true;
-    }).slice(0, 8);
-    if (!contoh.length) return;
+    const contoh = acak((K.soalContohBeranda || []).filter(s => s && s.q && Array.isArray(s.o)));
+    if (!contoh.length) { kartu.closest('.hb-demo').hidden = true; return; }
 
     let n = 0;
     const poin = $('#demoPoin');
     const tampil = () => {
       const s = contoh[n % contoh.length];
       n += 1;
+      // Posisi jawaban benar diacak seperti di ujian sungguhan.
+      const urut = acak(s.o.map((_, i) => i));
       kartu.innerHTML = `
         <div class="demo-kepala"><span>Contoh soal</span><span class="demo-jam">2:00</span></div>
         <div class="demo-ikon">${window.IkonSoal.svg(s)}</div>
         <p class="demo-tanya">${aman(s.q)}</p>
         <div class="demo-ubin">
-          ${s.o.map((o, i) => `<span class="ubin-mini ${WARNA_UBIN[i]}${i === s.a ? ' benar' : ''}" style="--i:${i}">
-              <i>${BENTUK[i]}</i><em>${aman(o)}</em></span>`).join('')}
+          ${urut.map((asli, i) => `<span class="ubin-mini ${WARNA_UBIN[i]}${asli === s.a ? ' benar' : ''}" style="--i:${i}">
+              <i>${BENTUK[i]}</i><em>${aman(s.o[asli])}</em></span>`).join('')}
         </div>`;
       if (poin) { poin.classList.remove('muncul'); void poin.offsetWidth; poin.classList.add('muncul'); }
     };
