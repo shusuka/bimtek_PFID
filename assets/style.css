@@ -424,7 +424,11 @@ a:hover { color: var(--kuning); }
   background: #ffffff;
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
-.jenis-opsi input { position: absolute; opacity: 0; pointer-events: none; }
+/* Radio disembunyikan di dalam kartunya sendiri. Tanpa position:relative
+   dan ukuran 1px, aturan .kolom input { width:100% } membuatnya melebar
+   ke leluhur terdekat dan halaman admin bisa bergeser ke samping. */
+.pilih-jenis .jenis-opsi { position: relative; }
+.jenis-opsi input { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
 .jenis-opsi b { color: var(--navy); font-size: 15px; }
 .jenis-opsi small { color: var(--teks-samar); font-size: 12.5px; line-height: 1.5; }
 .jenis-opsi:hover { border-color: var(--biru); }
@@ -939,6 +943,75 @@ table.tabel-impor td { vertical-align: top; }
   color: #8a5c05; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
   font-weight: 600;
 }
+
+/* ══ 7. KOMPONEN BERSAMA (dipakai tampilan klasik & baru) ═════════════ */
+
+/* Elemen yang hanya milik salah satu tampilan. tampilan-baru.css
+   membalik aturan ini saat tampilan baru aktif. */
+.hanya-baru { display: none; }
+
+/* tautan menu yang sedang dibuka */
+.nav-kanan a.aktif { color: var(--biru); }
+
+/* ── pilihan tampilan (pojok kanan bawah) ── */
+.pilih-tampilan {
+  position: fixed; right: 12px; bottom: 12px; z-index: 40;
+  display: flex; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 999px;
+  background: rgba(255, 255, 255, .92); border: 1px solid var(--garis-kuat);
+  box-shadow: var(--bayang); font-family: var(--font); font-size: 12px;
+}
+.pilih-tampilan span { padding: 0 8px 0 10px; color: var(--teks-samar); font-weight: 600; }
+.pilih-tampilan button {
+  border: 0; background: transparent; cursor: pointer; font: inherit; font-weight: 700;
+  color: var(--navy); padding: 6px 12px; border-radius: 999px;
+}
+.pilih-tampilan button[aria-pressed="true"] { background: var(--navy); color: #ffffff; }
+@media print { .pilih-tampilan { display: none !important; } }
+/* di ponsel pita mode lokal naik satu baris supaya tidak menumpuk */
+@media (max-width: 620px) { .pita-lokal { bottom: 60px; right: 12px; } }
+
+/* ── rekap per sesi (Ruang Admin) ── */
+.saring-rekap { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--garis-kuat); background: #ffffff;
+  font-family: var(--font); font-size: 13.5px; font-weight: 600; color: var(--navy);
+}
+.chip small {
+  font-size: 11.5px; padding: 1px 7px; border-radius: 999px;
+  background: var(--latar-2); color: var(--teks-samar);
+}
+.chip.aktif { background: var(--navy); border-color: var(--navy); color: #ffffff; }
+.chip.aktif small { background: rgba(255, 255, 255, .18); color: #ffffff; }
+
+.daftar-rekap { display: grid; gap: 12px; }
+.kartu-rekap.disorot { border-color: var(--emas-tua); box-shadow: 0 0 0 3px rgba(240, 180, 41, .28), var(--bayang); }
+.rekap-kepala {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+}
+.rekap-status {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--teks-samar);
+}
+.rekap-status.jalan { color: var(--benar); }
+.rekap-judul { font-size: 17px; font-weight: 700; color: var(--navy); margin-top: 8px; line-height: 1.35; }
+.rekap-rinci { font-size: 13px; color: var(--teks-samar); margin-top: 4px; }
+.rekap-rinci b { color: var(--teks); font-weight: 600; }
+.rekap-angka {
+  display: grid; gap: 10px; margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.rekap-angka > div {
+  padding: 11px 13px; border-radius: 9px; background: var(--latar-2);
+  display: grid; gap: 2px;
+}
+.rekap-angka b { font-size: 22px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.rekap-angka span { font-size: 11.5px; color: var(--teks-samar); letter-spacing: .04em; }
+.rekap-angka .sorot { background: rgba(240, 180, 41, .16); }
+.rekap-angka .sorot b { color: var(--kuning); }
+.rekap-angka .waspada b { color: var(--salah); }
 
 /* ── aksesibilitas & cetak ── */
 @media (prefers-reduced-motion: reduce) {

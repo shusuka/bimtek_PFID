@@ -39,8 +39,10 @@ pada jendela waktu yang dibuka panitia.
 
 | Berkas | Isinya |
 | --- | --- |
-| `index.html` | Halaman muka (hero langit cerah satu layar penuh) + rangka aplikasi |
-| `assets/style.css` | Seluruh gaya tampilan: tema terang, ubin jawaban, animasi |
+| `index.html` | Halaman muka (beranda baru dan beranda klasik) + rangka aplikasi |
+| `assets/style.css` | Gaya dasar = tampilan klasik: tema terang, ubin jawaban, animasi |
+| `assets/tampilan-baru.css` | Tampilan baru (bawaan), ditumpuk di atas style.css |
+| `assets/ikon-soal.js` | 26 ilustrasi SVG beranimasi, satu per topik soal |
 | `assets/konfig.js` | Jenis tes, nilai bawaan sesi, dan rumus poin |
 | `assets/wilayah.js` | 38 provinsi + 514 kabupaten/kota untuk pilihan pemda |
 | `assets/soal.js` | Bank soal bawaan, 25 butir dari berkas .docx penyelenggara |
@@ -58,6 +60,21 @@ pada jendela waktu yang dibuka panitia.
 
 Alamat di dalam situs: `#/` beranda · `#/cara` · `#/akun` · `#/lobi` ·
 `#/siap` · `#/tes` · `#/hasil` · `#/peringkat` · `#/admin` · `#/bantuan`
+
+### Dua tampilan: baru dan klasik
+
+Tampilan baru (`assets/tampilan-baru.css`) jadi bawaan. Tombol **Tampilan: Baru |
+Klasik** di pojok kanan bawah mematikan lembar gaya itu sehingga tampilan lama
+kembali utuh; pilihannya diingat per perangkat (`localStorage` kunci
+`pretest_tampilan`). Tombol ini disembunyikan selama ujian berlangsung.
+Elemen yang hanya milik satu tampilan diberi kelas `hanya-baru` / `hanya-klasik`.
+
+Tiap soal di tampilan baru ditemani ilustrasi dari `assets/ikon-soal.js`. Ikonnya
+ditebak dari teks pertanyaan, jadi soal hasil impor ikut mendapat ikon; bila
+perlu memaksa ikon tertentu, isi kolom `ikon` pada butir soal dengan nama
+kuncinya (daftar ada di `IkonSoal.daftar`). Garisnya tergambar saat soal muncul,
+lalu satu bagian kecil bergerak beberapa kali sebelum diam. Semua gerak
+dimatikan bila perangkat meminta *kurangi gerakan*.
 
 ### Rekap Excel tanpa pustaka luar
 
@@ -82,6 +99,9 @@ pada `file://`, dan aplikasi akan turun ke **mode lokal** (pita kuning
 di kiri bawah, data hanya mengendap di peramban itu). Mode lokal berguna untuk
 gladi bersih: seluruh alur tetap jalan tanpa jaringan, dan Ruang Admin terbuka
 tanpa pemeriksaan karena tidak ada yang bisa diperiksa.
+
+Untuk menguji lewat `http://` **tanpa** menulis ke Firestore sungguhan, tambahkan
+`?lokal` di alamat: <http://localhost:3900/?lokal>.
 
 ---
 
@@ -200,10 +220,23 @@ Koleksinya:
 
 | Koleksi | Isi |
 | --- | --- |
-| `pretestAkun/{idAkun}` | profil peserta — nama, email, pemda, provinsi |
+| `pretestAkun/{idAkun}` | profil peserta: nama, email, No. telepon, pemda, provinsi, dan peta `ikut` (sesi yang pernah dimasuki) |
 | `pretestSesi/aktif` | jenis tes, jadwal, & token sesi yang sedang berjalan |
 | `pretestBank/aktif` | bank soal hasil impor panitia — menimpa `assets/soal.js` |
 | `pretestHasil/{auto}` | nilai akhir tiap peserta, termasuk waktu tiap butir soal |
+
+**No. telepon** wajib diisi saat mendaftar (dirapikan ke bentuk `08…`). Akun
+yang dibuat sebelum kolom ini ada diminta melengkapi nomornya sekali saat masuk
+lagi. Nomor ikut tersimpan di rekaman nilai dan di semua rekap.
+
+**Rekap per sesi.** Satu sesi = kode sesi + jenis tes (pre/post) + token. Saat
+token peserta diterima di lobi, akunnya mendapat catatan di peta `ikut`
+(menumpang di `pretestAkun`, jadi tidak perlu aturan Firestore baru). Kartu
+"Rekap per sesi" di Ruang Admin membandingkan yang **masuk sesi** dengan yang
+**mengumpulkan**, pre-test dan post-test selalu terpisah, dan tiap kartu punya
+tombol *Unduh Excel sesi ini* (sheet Ringkasan, Peserta, Kehadiran, Waktu Soal,
+Rincian Jawaban). Menekan *Akhiri sesi sekarang* langsung menyorot kartu sesi
+tersebut.
 
 Tiap rekaman di `pretestHasil` menyimpan larik `jawaban`, satu entri per butir
 berisi `id` soal, nomor urutnya di layar peserta, pilihan, benar/salah, poin, dan

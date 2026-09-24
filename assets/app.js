@@ -179,6 +179,15 @@
 
   const angkaRapi = (n) => Number(n || 0).toLocaleString('id-ID');
 
+  // Nomor ponsel Indonesia dirapikan ke bentuk 08…; +62/62 di depan diganti
+  // 0. Mengembalikan '' bila bukan nomor yang masuk akal (9–14 angka).
+  function rapikanTelepon(t) {
+    let d = String(t || '').replace(/[^\d+]/g, '');
+    if (d.startsWith('+')) d = d.slice(1);
+    if (d.startsWith('62')) d = '0' + d.slice(2);
+    return /^0\d{8,13}$/.test(d) ? d : '';
+  }
+
   // Token peserta: 6 karakter huruf & angka, tanpa I O 0 1 supaya tidak salah
   // dibaca saat dituliskan di papan tulis atau dibacakan ke kelas.
   function tokenAcak(panjang) {
@@ -243,11 +252,21 @@
   const jenisSah = (j) => (j === 'post' ? 'post' : 'pre');
   const infoJenis = (j) => JENIS[jenisSah(j)] || JENIS.pre;
 
+  // Satu "sesi" pada rekap = kode sesi + jenis tes + token. Panitia bisa
+  // memakai kode yang sama untuk pre dan post, atau mengacak token baru
+  // tiap kelas; ketiganya bersama-sama membedakan satu pelaksanaan.
+  // Dipakai juga sebagai kunci peta di Firestore, jadi hanya huruf, angka,
+  // - dan _ yang dibiarkan.
+  const kunciSesi = (kode, jenis, token) =>
+    [kode || 'sesi', jenisSah(jenis), String(token || '').trim().toUpperCase() || 'TANPA-TOKEN']
+      .map(x => String(x).replace(/[^A-Za-z0-9_-]+/g, '-')).join('__');
+
   /* ── 3. Keadaan aplikasi ─────────────────────────────────────── */
 
   const KUNCI_AKUN_SAYA = 'pretest_akun_saya';
   const KUNCI_MAIN = 'pretest_main_v2';
   const KUNCI_HASIL_SESI = 'pretest_hasil_v2';
+  const KUNCI_ISI_EMAIL = 'pretest_isi_email';
 
   let akun = null;    // { nama, email, instansi, jabatan }
   let main = null;    // keadaan ujian yang sedang berjalan
@@ -330,11 +349,18 @@
 
     const fn = RUTE[location.hash || '#/'];
     window.scrollTo({ top: 0, behavior: 'auto' });
+    hentikanDemo();
+
+    // Tombol tampilan disembunyikan selama ujian supaya tidak menutupi
+    // ubin jawaban di layar ponsel.
+    const pilih = $('#pilihTampilan');
+    if (pilih) pilih.hidden = ['#/tes', '#/siap'].includes(location.hash);
 
     if (!fn) {
       hero.hidden = false;
       halaman.hidden = true;
       halaman.innerHTML = '';
+      hidupkanBeranda();
       return;
     }
     hero.hidden = true;
@@ -356,15 +382,106 @@
         </a>
         ${ringkas ? '' : `
         <div class="nav-kanan">
-          <a href="#/cara">Cara Ikut</a>
-          <a href="#/peringkat">Peringkat</a>
-          <a href="#/admin">Admin</a>
-          <a href="#/bantuan">Bantuan</a>
+          ${[['#/cara', 'Cara Ikut'], ['#/peringkat', 'Peringkat'], ['#/admin', 'Admin'], ['#/bantuan', 'Bantuan']]
+            .map(([h, t]) => `<a href="${h}"${location.hash === h ? ' class="aktif" aria-current="page"' : ''}>${t}</a>`).join('')}
           ${akun
             ? `<a class="tombol-kaca" href="#/lobi">${aman(akun.nama.split(' ')[0])}</a>`
             : `<a class="tombol-kaca" href="#/akun">Masuk</a>`}
         </div>`}
       </header>`;
+  }
+
+  /* ── Pilihan tampilan: baru (bawaan) atau klasik ──────────────────
+     Tampilan baru = assets/tampilan-baru.css yang ditumpuk di atas
+     style.css. Memilih "Klasik" cukup mematikan lembar gaya itu, jadi
+     tampilan lama tetap utuh. Pilihan diingat per perangkat. */
+
+  const KUNCI_TAMPILAN = 'pretest_tampilan';
+
+  function pakaiTampilan(t) {
+    const nilai = t === 'klasik' ? 'klasik' : 'baru';
+    document.documentElement.setAttribute('data-tampilan', nilai);
+    const css = document.getElementById('cssBaru');
+    if (css) css.disabled = nilai === 'klasik';
+    try { localStorage.setItem(KUNCI_TAMPILAN, nilai); } catch { /* mode privat */ }
+    for (const b of document.querySelectorAll('#pilihTampilan [data-tampilan]')) {
+      b.setAttribute('aria-pressed', String(b.dataset.tampilan === nilai));
+    }
+  }
+
+  (function pasangPilihTampilan() {
+    const kotak = $('#pilihTampilan');
+    if (!kotak) return;
+    pakaiTampilan(document.documentElement.getAttribute('data-tampilan'));
+    kotak.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-tampilan]');
+      if (b) pakaiTampilan(b.dataset.tampilan);
+    });
+  })();
+
+  const kurangiGerak = () => !!(window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /* ── Beranda: status sesi + kartu contoh soal ─────────────────────
+     Kartu di sisi kanan beranda memutar beberapa soal asli dari bank
+     beserta ikonnya, supaya calon peserta langsung tahu bentuk ujiannya.
+     Hanya berjalan selama beranda terbuka dan tab terlihat. */
+
+  let demoId = null;
+
+  function hentikanDemo() {
+    if (demoId) { clearInterval(demoId); demoId = null; }
+  }
+
+  function hidupkanBeranda() {
+    const status = $('#heroStatus');
+    if (status) {
+      window.DB.ambilSesi().then((s) => {
+        const st = statusSesi(s);
+        const info = s ? infoJenis(s.jenis) : null;
+        const rinci = s
+          ? `${Math.min(s.jumlahSoal || 25, maksButir())} soal · ${lamaSoal(s.detikPerSoal || 30)} per soal`
+          : '';
+        const teks = {
+          buka: info ? `${aman(info.label)} sedang dibuka` : '',
+          menunggu: info ? `${aman(info.label)} dibuka ${aman(tanggalIndo(s.mulai))}` : ''
+        }[st.keadaan] || 'Belum ada sesi yang dibuka. Tunggu aba-aba panitia.';
+        status.innerHTML = `
+          <span class="hb-titik${st.keadaan === 'buka' ? ' buka' : ''}"></span>
+          <span><b>${teks}</b>${rinci ? `<small>${aman(rinci)}</small>` : ''}</span>`;
+      }).catch(() => { status.innerHTML = ''; });
+    }
+
+    const kartu = $('#demoKartu');
+    if (!kartu || !window.IkonSoal) return;
+    // Satu soal per ikon, supaya tiap putaran memperlihatkan gambar berbeda.
+    const dipakai = new Set();
+    const contoh = BANK.filter((s) => {
+      const k = window.IkonSoal.kunci(s);
+      if (dipakai.has(k)) return false;
+      dipakai.add(k);
+      return true;
+    }).slice(0, 8);
+    if (!contoh.length) return;
+
+    let n = 0;
+    const poin = $('#demoPoin');
+    const tampil = () => {
+      const s = contoh[n % contoh.length];
+      n += 1;
+      kartu.innerHTML = `
+        <div class="demo-kepala"><span>Contoh soal</span><span class="demo-jam">2:00</span></div>
+        <div class="demo-ikon">${window.IkonSoal.svg(s)}</div>
+        <p class="demo-tanya">${aman(s.q)}</p>
+        <div class="demo-ubin">
+          ${s.o.map((o, i) => `<span class="ubin-mini ${WARNA_UBIN[i]}${i === s.a ? ' benar' : ''}" style="--i:${i}">
+              <i>${BENTUK[i]}</i><em>${aman(o)}</em></span>`).join('')}
+        </div>`;
+      if (poin) { poin.classList.remove('muncul'); void poin.offsetWidth; poin.classList.add('muncul'); }
+    };
+    tampil();
+    if (kurangiGerak()) return;
+    demoId = setInterval(() => { if (!document.hidden) tampil(); }, 5200);
   }
 
   /* ── 5a. Cara Ikut ───────────────────────────────────────────── */
@@ -451,7 +568,8 @@
           <div class="kartu kartu-akun" style="margin-bottom:18px">
             <div class="label-sudut" style="margin:0 0 8px">Akun tersimpan di perangkat ini</div>
             <div class="akun-nama">${aman(akun.nama)}</div>
-            <div class="akun-rinci">${aman(akun.instansi)}<br>${aman(akun.email)}</div>
+            <div class="akun-rinci">${aman(akun.instansi)}<br>${aman(akun.email)}${
+              akun.telepon ? ' · ' + aman(akun.telepon) : ''}</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
               <a class="btn btn-kuning" href="#/lobi">Lanjut ke lobi ujian</a>
               <button class="btn btn-hantu" id="btnGanti">Ganti akun</button>
@@ -467,11 +585,17 @@
               <span class="catatan-hadiah">Pastikan alamat email yang diisi sudah benar dan aktif, karena akan ada voucher menarik bagi 3 besar pemenang.</span>
             </div>
             <div id="isianBaru" hidden>
-              <div class="kolom">
+              <div class="kolom" id="kolomNama">
                 <label for="fNama">Nama lengkap</label>
                 <input id="fNama" name="nama" type="text" autocomplete="name" placeholder="mis. Budi Santoso, S.T." />
               </div>
-              <div class="kolom kolom-pilih" style="margin-top:16px">
+              <div class="kolom" style="margin-top:16px">
+                <label for="fTelepon">No. telepon / WhatsApp</label>
+                <input id="fTelepon" name="telepon" type="tel" inputmode="tel" autocomplete="tel"
+                       placeholder="mis. 0812 3456 7890" />
+                <span class="petunjuk">Dipakai panitia untuk menghubungi Anda, termasuk bila masuk 3 besar.</span>
+              </div>
+              <div class="kolom kolom-pilih" id="kolomInstansi" style="margin-top:16px">
                 <label for="fInstansi">Pemerintah daerah</label>
                 <div class="pilih-bungkus">
                   <input id="fInstansi" name="instansi" type="text" autocomplete="off" spellcheck="false"
@@ -481,7 +605,7 @@
                 </div>
                 <span class="petunjuk">Pilih dari daftar — 514 kabupaten/kota dan 38 provinsi se-Indonesia.</span>
               </div>
-              <div class="kolom" style="margin-top:16px">
+              <div class="kolom" id="kolomJabatan" style="margin-top:16px">
                 <label for="fJabatan">Jabatan <span style="text-transform:none;letter-spacing:0">(boleh dikosongkan)</span></label>
                 <input id="fJabatan" name="jabatan" type="text" placeholder="mis. Operator eMonDAK" />
               </div>
@@ -503,7 +627,10 @@
     if (!form) return;
     const kotak = $('#pesanAkun');
     const tombol = $('#btnAkun');
-    let tahapDua = false;
+    // tahap: 'email' → 'baru' (daftar lengkap) atau 'lengkapi' (akun lama
+    // yang belum punya nomor telepon — cukup nomor itu saja yang diminta)
+    let tahap = 'email';
+    let akunLama = null;
 
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -515,27 +642,70 @@
         return;
       }
 
-      if (!tahapDua) {
+      if (tahap === 'email') {
         tombol.disabled = true; tombol.textContent = 'Memeriksa…';
         let ada = null;
         try { ada = await window.DB.ambilAkun(email); }
         catch (e) { console.warn('[akun] gagal memeriksa:', e); }
         tombol.disabled = false;
 
-        if (ada) {
+        if (ada && ada.telepon) {
           akun = {
             nama: ada.nama, email: ada.email, instansi: ada.instansi,
-            provinsi: ada.provinsi || provinsiDari(ada.instansi), jabatan: ada.jabatan || ''
+            provinsi: ada.provinsi || provinsiDari(ada.instansi), jabatan: ada.jabatan || '',
+            telepon: ada.telepon
           };
           simpanAkunLokal();
           ke('#/lobi');
           return;
         }
-        tahapDua = true;
+        if (ada) {
+          // Akun dibuat sebelum kolom telepon ada: minta nomornya sekali.
+          tahap = 'lengkapi';
+          akunLama = ada;
+          $('#isianBaru').hidden = false;
+          for (const id of ['#kolomNama', '#kolomInstansi', '#kolomJabatan']) $(id).hidden = true;
+          tombol.textContent = 'Simpan & lanjut';
+          kotak.innerHTML = '<div class="pesan pesan-info">Akun <b>' + aman(ada.nama) + '</b> ditemukan. ' +
+            'Lengkapi nomor telepon/WhatsApp sekali saja untuk melanjutkan.</div>';
+          $('#fTelepon').focus();
+          return;
+        }
+        tahap = 'baru';
         $('#isianBaru').hidden = false;
         tombol.textContent = 'Daftarkan akun';
-        kotak.innerHTML = '<div class="pesan pesan-info">Email ini belum terdaftar. Lengkapi nama dan instansi untuk membuat akun.</div>';
+        kotak.innerHTML = '<div class="pesan pesan-info">Email ini belum terdaftar. Lengkapi nama, nomor telepon, dan instansi untuk membuat akun.</div>';
         $('#fNama').focus();
+        return;
+      }
+
+      const telepon = rapikanTelepon(form.telepon.value);
+      if (!telepon) {
+        kotak.innerHTML = '<div class="pesan pesan-galat">Nomor telepon belum benar. ' +
+          'Tulis nomor ponsel aktif, mis. 0812 3456 7890 atau +62 812 3456 7890.</div>';
+        $('#fTelepon').focus();
+        return;
+      }
+
+      if (tahap === 'lengkapi') {
+        const a = akunLama;
+        const isi = {
+          nama: a.nama, email: a.email, instansi: a.instansi,
+          provinsi: a.provinsi || provinsiDari(a.instansi), jabatan: a.jabatan || '',
+          telepon, dibuat: a.dibuat
+        };
+        tombol.disabled = true; tombol.textContent = 'Menyimpan…';
+        try { await window.DB.simpanAkun(isi); }
+        catch (e) {
+          console.warn('[akun] gagal menyimpan telepon:', e);
+          kotak.innerHTML = '<div class="pesan pesan-galat">Nomor gagal disimpan ke server. Periksa sambungan internet lalu coba lagi.</div>';
+          tombol.disabled = false; tombol.textContent = 'Simpan & lanjut';
+          return;
+        }
+        akun = { nama: isi.nama, email: isi.email, instansi: isi.instansi,
+                 provinsi: isi.provinsi, jabatan: isi.jabatan, telepon };
+        simpanAkunLokal();
+        ke('#/lobi');
         return;
       }
 
@@ -553,25 +723,40 @@
 
       tombol.disabled = true; tombol.textContent = 'Menyimpan…';
       try {
-        await window.DB.simpanAkun({ nama, email, instansi, provinsi, jabatan });
+        await window.DB.simpanAkun({ nama, email, instansi, provinsi, jabatan, telepon });
       } catch (e) {
         console.warn('[akun] gagal menyimpan:', e);
         kotak.innerHTML = '<div class="pesan pesan-galat">Akun gagal disimpan ke server. Periksa sambungan internet lalu coba lagi.</div>';
         tombol.disabled = false; tombol.textContent = 'Daftarkan akun';
         return;
       }
-      akun = { nama, email, instansi, provinsi, jabatan };
+      akun = { nama, email, instansi, provinsi, jabatan, telepon };
       simpanAkunLokal();
       ke('#/lobi');
     });
 
     pasangPilihPemda('fInstansi', 'daftarPemda');
+
+    const isiEmail = sessionStorage.getItem(KUNCI_ISI_EMAIL);
+    if (isiEmail) {
+      sessionStorage.removeItem(KUNCI_ISI_EMAIL);
+      form.email.value = isiEmail;
+      form.requestSubmit();
+    }
   }
 
   /* ── 5c. Lobi ────────────────────────────────────────────────── */
 
   function halamanLobi() {
     if (!akun) { ke('#/akun'); return; }
+    // Akun yang tersimpan di perangkat sebelum kolom telepon ada: kembali ke
+    // formulir akun dengan email terisi, supaya nomornya diminta sekali.
+    if (!akun.telepon) {
+      sessionStorage.setItem(KUNCI_ISI_EMAIL, akun.email);
+      akun = null; simpanAkunLokal();
+      ke('#/akun');
+      return;
+    }
 
     halaman.innerHTML = kop('Lobi Ujian') + `
       <div class="wadah wadah-sempit">
@@ -707,6 +892,15 @@
       };
       hasil = null; simpanHasilSesi();
       simpanMain();
+
+      // Catat kehadiran untuk rekap per sesi. Tidak ditunggu lama: bila
+      // gagal, peserta tetap bisa mengerjakan — nilainya sendiri yang
+      // menjadi bukti ikut.
+      window.DB.catatIkut(akun, kunciSesi(main.sesiKode, main.jenisTes, main.sesiToken), {
+        judul: main.sesiJudul || '', kode: main.sesiKode, jenis: main.jenisTes,
+        token: String(main.sesiToken || '').trim().toUpperCase()
+      }).catch(e => console.warn('[lobi] gagal mencatat kehadiran:', e));
+
       ke('#/siap');
     };
   }
@@ -806,6 +1000,7 @@
           </div>
         </div>
         <div class="rel"><span id="relWaktu" style="width:100%"></span></div>
+        <div class="jejak-soal hanya-baru" id="jejakSoal" aria-hidden="true"></div>
         <div id="panggung"></div>
       </div>
       <div id="kilat" class="kilat" hidden></div>`;
@@ -828,9 +1023,14 @@
     $('#poinKini').textContent = angkaRapi(main.poin) + ' poin';
     perbaruiBeruntun();
 
+    gambarJejak();
+
     $('#panggung').innerHTML = `
       <div class="kartu kartu-soal" id="kartuSoal">
-        <p class="teks-soal">${aman(s.q)}</p>
+        ${window.IkonSoal ? `<div class="soal-ikon hanya-baru">${window.IkonSoal.svg(s)}</div>` : ''}
+        <div class="soal-isi">
+          <p class="teks-soal">${aman(s.q)}</p>
+        </div>
       </div>
       <div class="ubin-daftar" id="ubinDaftar">
         ${butir.urut.map((asli, n) => `
@@ -847,6 +1047,19 @@
     };
 
     jalankanJamSoal();
+  }
+
+  /* Jejak soal (tampilan baru): satu ruas per butir, hijau bila benar,
+     merah bila salah atau habis waktu, dan ruas yang sedang dikerjakan
+     ditandai. Peserta tahu posisinya tanpa membaca angka. */
+  function gambarJejak() {
+    const el = $('#jejakSoal');
+    if (!el) return;
+    el.innerHTML = main.butir.map((b, n) => {
+      const j = main.jawaban[b.id];
+      const kelas = j ? (j.benar ? 'benar' : 'salah') : (n === main.indeks ? 'kini' : '');
+      return `<i class="${kelas}"></i>`;
+    }).join('');
   }
 
   function perbaruiBeruntun() {
@@ -882,6 +1095,7 @@
       if (jam) {
         jam.textContent = detik;
         jam.classList.toggle('mepet', detik <= 5);
+        jam.style.setProperty('--sisa', Math.max(0, sisa / batas).toFixed(4));
       }
       if (rel) rel.style.width = Math.max(0, (sisa / batas) * 100) + '%';
       if (detik <= 5 && detik > 0 && detik !== terakhirTik) { terakhirTik = detik; Suara.tik(); }
@@ -934,6 +1148,7 @@
     }
     $('#poinKini').textContent = angkaRapi(main.poin) + ' poin';
     perbaruiBeruntun();
+    gambarJejak();
     benar ? Suara.benar() : Suara.salah();
     kilat(benar, poin, pilih === -1);
     if (benar) taburKonfeti();
@@ -1006,6 +1221,7 @@
       instansi: a.instansi,
       provinsi: a.provinsi || provinsiDari(a.instansi),
       jabatan: a.jabatan || '',
+      telepon: a.telepon || '',
       sesiKode: main.sesiKode,
       sesiJudul: main.sesiJudul,
       sesiToken: main.sesiToken || '',
@@ -1053,7 +1269,7 @@
         ${h.tersimpan ? '' : '<div class="pesan pesan-galat" style="margin-bottom:18px">Nilai Anda gagal dikirim ke server (jaringan bermasalah). Tunjukkan layar ini ke panitia sebelum menutup halaman.</div>'}
 
         <div class="kartu" style="text-align:center">
-          <div class="poin-besar">${angkaRapi(h.poin)}</div>
+          <div class="poin-besar" data-hitung="${Number(h.poin) || 0}">${angkaRapi(h.poin)}</div>
           <div class="skor-ket">poin terkumpul</div>
           <div class="grid-statistik">
             <div class="statistik"><div class="angka">${h.skor}</div><div class="nama">Nilai (0–100)</div></div>
@@ -1081,6 +1297,7 @@
             const waktu = r.detik != null ? ` · ${r.detik} detik` : '';
             return `
               <div class="butir${r.benar ? ' tepat' : ''}">
+                ${window.IkonSoal ? `<div class="butir-ikon hanya-baru">${window.IkonSoal.svg(s, { statis: true })}</div>` : ''}
                 <div class="tanya">${n + 1}. ${aman(s.q)}</div>
                 <div class="baris kunci">Kunci: <b>${aman(s.o[s.a])}</b></div>
                 ${r.benar
@@ -1091,6 +1308,24 @@
           }).join('')}
         </div>
       </div>`;
+
+    hitungNaik($('.poin-besar[data-hitung]'));
+  }
+
+  /* Angka poin naik dari nol saat halaman hasil terbuka. Sekali saja per
+     kunjungan; dilewati bila pengguna memilih kurangi gerakan. */
+  function hitungNaik(el) {
+    if (!el || kurangiGerak()) return;
+    const akhir = Number(el.dataset.hitung) || 0;
+    const lama = 1100;
+    const mulai = performance.now();
+    const langkah = (t) => {
+      const p = Math.min(1, (t - mulai) / lama);
+      const lunak = 1 - Math.pow(1 - p, 3);
+      el.textContent = angkaRapi(Math.round(akhir * lunak));
+      if (p < 1 && document.body.contains(el)) requestAnimationFrame(langkah);
+    };
+    requestAnimationFrame(langkah);
   }
 
   /* Rekap waktu tiap butir untuk satu peserta. Batang di kolom terakhir
@@ -1334,7 +1569,7 @@
             </div>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn btn-kuning" id="btnUnduhXlsx">Unduh Excel</button>
+            <button class="btn btn-kuning" id="btnUnduhXlsx" title="Satu berkas berisi semua sesi; Excel per sesi ada di bagian Rekap per sesi">Unduh Excel semua sesi</button>
             <button class="btn btn-hantu" id="btnUnduh">Unduh CSV</button>
             <button class="btn btn-hantu" id="btnKeluarAdmin">Keluar</button>
           </div>
@@ -1342,6 +1577,14 @@
 
         <div class="kartu" id="kartuSesi"><div class="kosong">Memuat pengaturan sesi…</div></div>
         <div id="pesanSesi"></div>
+
+        <h2 class="judul-halaman" id="judulRekapSesi" style="font-size:20px;margin:34px 0 6px">Rekap per sesi</h2>
+        <p class="ket-halaman">
+          Satu kartu untuk tiap pelaksanaan; pre-test dan post-test selalu terpisah. Begitu sesi
+          diakhiri, jumlah peserta yang masuk dan yang mengumpulkan langsung tampil di sini, dan
+          Excel-nya bisa diunduh per sesi.
+        </p>
+        <div id="rekapSesi"><div class="kosong">Memuat rekap…</div></div>
 
         <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Bank soal</h2>
         <p class="ket-halaman">
@@ -1388,6 +1631,8 @@
       ke('#/');
     };
 
+    rekapTergambar = null;
+
     // ── bank soal ──
     imporKini = null;
     gambarBank();
@@ -1405,6 +1650,7 @@
       // kotak "Tampilkan" sampai ada peserta pertama yang mengumpulkan.
       const sidik = (sesi.kode || '') + '|' + (sesi.token || '');
       if (sidik !== sidikSesi) { sidikSesi = sidik; gambarPantauan(daftarKini); }
+      gambarRekapSesi();
     });
 
     // Penunjuk lama sesi berdenyut sendiri tiap detik. Hanya isi teksnya yang
@@ -1415,10 +1661,20 @@
     // ── pemantauan hasil ──
     const lepasHasil = window.DB.pantauHasil((daftar) => {
       daftarKini = urutkan(daftar);
+      rekapHasil = daftarKini;
       gambarPantauan(daftarKini);
+      gambarRekapSesi();
+    });
+    // Akun ikut dipantau: peta `ikut` di tiap akun adalah catatan siapa saja
+    // yang memasukkan token sesi, dasar hitungan "masuk sesi" pada rekap.
+    const lepasAkun = window.DB.pantauAkun((daftar) => {
+      rekapAkun = daftar;
+      teleponAkun = new Map(daftar.filter(a => a.telepon)
+        .map(a => [String(a.emailKunci || a.email || '').trim().toLowerCase(), a.telepon]));
+      gambarRekapSesi();
     });
     const lepasSesi = lepasPantau;
-    lepasPantau = () => { lepasSesi(); lepasHasil(); };
+    lepasPantau = () => { lepasSesi(); lepasHasil(); lepasAkun(); };
 
     $('#btnUnduh').onclick = () => unduhCsv(saringTampil(daftarKini));
     $('#btnUnduhXlsx').onclick = () => unduhExcel(daftarKini);
@@ -1710,7 +1966,15 @@
       if (!confirm('Akhiri sesi sekarang?\n' +
         'Peserta yang belum masuk tidak dapat lagi memakai token ini, dan lembar jawaban ' +
         'yang sedang dikerjakan langsung dikumpulkan.')) return;
-      simpan({ aktif: false, selesai: new Date().toISOString() });
+      // Kartu rekap sesi yang baru dihentikan disorot dan digulir ke layar,
+      // supaya panitia langsung melihat berapa yang masuk dan mengumpulkan.
+      const isi = bacaForm();
+      sorotRekap = kunciSesi(isi.kode, isi.jenis, isi.token);
+      simpan({ aktif: false, selesai: new Date().toISOString() }).then(() => {
+        gambarRekapSesi();
+        const kartu = document.querySelector('.kartu-rekap.disorot');
+        if (kartu) kartu.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     };
     const tAkhiri = $('#btnAkhiri');
     if (tAkhiri) tAkhiri.onclick = akhiri;
@@ -1727,6 +1991,9 @@
   async function gambarPantauan(daftar) {
     const kotak = $('#isiAdmin');
     if (!kotak) return;
+    // kelas .kosong hanya untuk teks "Memuat data…"; kalau dibiarkan, seluruh
+    // isi pemantauan ikut rata tengah
+    kotak.classList.remove('kosong');
 
     const kode = (sesi && sesi.kode) || null;
     const tampil = saringTampil(daftar);
@@ -1746,8 +2013,10 @@
     if (saringToken && saringToken !== '*' && !hitungToken.has(saringToken)) hitungToken.set(saringToken, 0);
     const pilihanToken = [...hitungToken.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-    let jumlahAkun = '—';
-    try { jumlahAkun = await window.DB.jumlahAkun(); } catch { /* biarkan */ }
+    let jumlahAkun = rekapAkun ? rekapAkun.length : '—';
+    if (!rekapAkun) {
+      try { jumlahAkun = await window.DB.jumlahAkun(); } catch { /* biarkan */ }
+    }
 
     const n = tampil.length;
     const instansi = new Set(tampil.map(p => (p.instansi || '').trim().toLowerCase())).size;
@@ -1796,7 +2065,7 @@
       <div class="tabel-bungkus">
         <table class="tabel" id="tabelAdmin">
           <thead>
-            <tr><th>#</th><th>Nama</th><th>Email</th><th>Pemda</th><th>Provinsi</th>
+            <tr><th>#</th><th>Nama</th><th>Email</th><th>No. telepon</th><th>Pemda</th><th>Provinsi</th>
                 <th>Jenis</th><th>Token</th>
                 <th class="angka">Poin</th><th class="angka">Nilai</th><th class="angka">Benar</th>
                 <th class="angka">Waktu</th><th class="angka">Rata/soal</th><th>Selesai</th><th></th></tr>
@@ -1807,6 +2076,7 @@
                 <td class="peringkat-nomor">${i + 1}</td>
                 <td class="bebas">${aman(p.nama)}</td>
                 <td>${aman(p.email)}</td>
+                <td class="mono">${aman(p.telepon || teleponAkun.get(emailKunciDari(p)) || '—')}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
                 <td>${aman(p.provinsi || provinsiDari(p.instansi))}</td>
                 <td><span class="lencana-jenis kecil ${jenisSah(p.jenisTes)}">${aman(infoJenis(p.jenisTes).label)}</span></td>
@@ -1948,16 +2218,216 @@
   }
 
 
+  /* ── Rekap per sesi ──────────────────────────────────────────────
+     Satu kartu = satu pelaksanaan (kode + jenis tes + token). "Masuk sesi"
+     dihitung dari catatan `ikut` di akun peserta ditambah siapa pun yang
+     nilainya masuk (rekaman lama belum punya catatan ikut), "mengumpulkan"
+     dari rekaman nilai. Selisihnya = peserta yang masuk dengan token tetapi
+     tidak sampai mengumpulkan. */
+
+  let rekapHasil = [];
+  let rekapAkun = null;
+  let teleponAkun = new Map();
+  let saringJenisRekap = 'semua';
+  let sorotRekap = null;
+  let rekapTergambar = null;
+
+  const emailKunciDari = (x) => String(x.emailKunci || x.email || '').trim().toLowerCase();
+
+  function susunRekapSesi() {
+    const grup = new Map();
+    const ambil = (kunci, dasar) => {
+      if (!grup.has(kunci)) {
+        grup.set(kunci, {
+          kunci, kode: dasar.kode || 'sesi', jenis: jenisSah(dasar.jenis),
+          token: String(dasar.token || '').trim().toUpperCase(), judul: dasar.judul || '',
+          hadir: new Map(), hasil: [], terakhir: ''
+        });
+      }
+      const g = grup.get(kunci);
+      if (!g.judul && dasar.judul) g.judul = dasar.judul;
+      return g;
+    };
+    const catatWaktu = (g, w) => { if (w && w > g.terakhir) g.terakhir = w; };
+
+    for (const a of rekapAkun || []) {
+      for (const [kunci, info] of Object.entries(a.ikut || {})) {
+        const g = ambil(kunci, info || {});
+        g.hadir.set(emailKunciDari(a), {
+          nama: a.nama, email: a.email, instansi: a.instansi,
+          provinsi: a.provinsi || provinsiDari(a.instansi), telepon: a.telepon || '',
+          masuk: (info && info.waktu) || ''
+        });
+        catatWaktu(g, info && info.waktu);
+      }
+    }
+    for (const p of rekapHasil) {
+      const g = ambil(kunciSesi(p.sesiKode, p.jenisTes, p.sesiToken), {
+        kode: p.sesiKode, jenis: p.jenisTes, token: p.sesiToken, judul: p.sesiJudul
+      });
+      g.hasil.push(p);
+      const e = emailKunciDari(p);
+      if (!g.hadir.has(e)) {
+        g.hadir.set(e, {
+          nama: p.nama, email: p.email, instansi: p.instansi,
+          provinsi: p.provinsi || provinsiDari(p.instansi),
+          telepon: p.telepon || teleponAkun.get(e) || '', masuk: ''
+        });
+      }
+      catatWaktu(g, p.waktuSelesai);
+    }
+
+    // Sesi yang sedang diatur panitia selalu tampil, walau belum ada peserta.
+    const kini = sesi && sesi.token ? kunciSesi(sesi.kode, sesi.jenis, sesi.token) : null;
+    if (kini) {
+      const g = ambil(kini, { kode: sesi.kode, jenis: sesi.jenis, token: sesi.token, judul: sesi.judul });
+      g.kini = true;
+      catatWaktu(g, sesi.mulai || sesi.diubah);
+    }
+
+    return [...grup.values()].sort((a, b) =>
+      (b.kini ? 1 : 0) - (a.kini ? 1 : 0) || String(b.terakhir).localeCompare(String(a.terakhir)));
+  }
+
+  function angkaRekap(g) {
+    const pengumpul = new Set(g.hasil.map(emailKunciDari));
+    const n = g.hasil.length;
+    return {
+      masuk: g.hadir.size,
+      kumpul: pengumpul.size,
+      belum: [...g.hadir.keys()].filter(e => !pengumpul.has(e)).length,
+      rata: n ? Math.round(g.hasil.reduce((t, p) => t + (p.skor || 0), 0) / n) : null,
+      rataPoin: n ? Math.round(g.hasil.reduce((t, p) => t + (p.poin || 0), 0) / n) : null
+    };
+  }
+
+  function gambarRekapSesi() {
+    const kotak = $('#rekapSesi');
+    if (!kotak) return;
+    const daftar = susunRekapSesi();
+    const st = statusSesi(sesi);
+    const cap = JSON.stringify([saringJenisRekap, sorotRekap, st.keadaan,
+      daftar.map(g => [g.kunci, g.judul, g.hadir.size, g.hasil.length, g.kini || false])]);
+    if (cap === rekapTergambar) return;
+    rekapTergambar = cap;
+
+    const tampil = daftar.filter(g => saringJenisRekap === 'semua' || g.jenis === saringJenisRekap);
+    const jumlahJenis = (j) => daftar.filter(g => g.jenis === j).length;
+
+    const kartu = tampil.map(g => {
+      const a = angkaRekap(g);
+      const berjalan = g.kini && st.keadaan === 'buka';
+      const label = berjalan ? 'Sedang berjalan'
+        : (g.kini && st.keadaan === 'menunggu' ? 'Terjadwal' : 'Selesai');
+      return `
+        <article class="kartu kartu-rekap${g.kunci === sorotRekap ? ' disorot' : ''}" data-kunci="${aman(g.kunci)}">
+          <div class="rekap-kepala">
+            <div>
+              <span class="lencana-jenis kecil ${g.jenis}">${aman(infoJenis(g.jenis).label)}</span>
+              <span class="rekap-status ${berjalan ? 'jalan' : ''}">${label}</span>
+              <div class="rekap-judul">${aman(g.judul || 'Tanpa judul')}</div>
+              <div class="rekap-rinci">Kode <b>${aman(g.kode)}</b> · token <b class="mono">${aman(g.token || '—')}</b>${
+                g.terakhir ? ' · ' + aman(tanggalIndo(g.terakhir)) : ''}</div>
+            </div>
+            <button class="btn btn-kecil btn-kuning" data-unduh-sesi="${aman(g.kunci)}"
+                    ${a.masuk ? '' : 'disabled'}>Unduh Excel sesi ini</button>
+          </div>
+          <div class="rekap-angka">
+            <div><b>${a.masuk}</b><span>Masuk sesi</span></div>
+            <div class="sorot"><b>${a.kumpul}</b><span>Mengumpulkan</span></div>
+            <div${a.belum ? ' class="waspada"' : ''}><b>${a.belum}</b><span>Belum mengumpulkan</span></div>
+            <div><b>${a.rata == null ? '—' : a.rata}</b><span>Rata-rata nilai</span></div>
+            <div><b>${a.rataPoin == null ? '—' : angkaRapi(a.rataPoin)}</b><span>Rata-rata poin</span></div>
+          </div>
+        </article>`;
+    }).join('');
+
+    kotak.innerHTML = `
+      <div class="saring-rekap" role="group" aria-label="Saring jenis tes">
+        ${[['semua', 'Semua', daftar.length], ['pre', infoJenis('pre').label, jumlahJenis('pre')],
+           ['post', infoJenis('post').label, jumlahJenis('post')]].map(([v, t, n]) => `
+          <button type="button" class="chip${saringJenisRekap === v ? ' aktif' : ''}" data-saring-rekap="${v}">
+            ${aman(t)} <small>${n}</small></button>`).join('')}
+      </div>
+      ${tampil.length ? `<div class="daftar-rekap">${kartu}</div>`
+        : '<div class="kartu"><div class="kosong">Belum ada sesi pada pilihan ini.</div></div>'}`;
+
+    for (const t of kotak.querySelectorAll('[data-saring-rekap]')) {
+      t.onclick = () => { saringJenisRekap = t.dataset.saringRekap; gambarRekapSesi(); };
+    }
+    for (const t of kotak.querySelectorAll('[data-unduh-sesi]')) {
+      t.onclick = () => {
+        const g = susunRekapSesi().find(x => x.kunci === t.dataset.unduhSesi);
+        if (g) unduhExcelSesi(g);
+      };
+    }
+  }
+
+  /* Excel untuk SATU sesi: ringkasan, peringkat peserta, daftar kehadiran
+     (siapa yang masuk tapi tidak mengumpulkan), waktu per soal, dan
+     rincian jawaban. */
+  function unduhExcelSesi(g) {
+    const hasilUrut = urutkan(g.hasil);
+    const a = angkaRekap(g);
+    const info = infoJenis(g.jenis);
+
+    const ringkas = [
+      ['Rekap', info.label + ' — ' + (g.judul || 'tanpa judul')],
+      ['Jenis Tes', info.label],
+      ['Kode Sesi', g.kode],
+      ['Token', g.token || ''],
+      ['Masuk sesi', a.masuk],
+      ['Mengumpulkan', a.kumpul],
+      ['Belum mengumpulkan', a.belum],
+      ['Rata-rata nilai', a.rata == null ? '' : a.rata],
+      ['Rata-rata poin', a.rataPoin == null ? '' : a.rataPoin],
+      ['Nilai tertinggi', hasilUrut.length ? Math.max(...hasilUrut.map(p => p.skor || 0)) : ''],
+      ['Nilai terendah', hasilUrut.length ? Math.min(...hasilUrut.map(p => p.skor || 0)) : ''],
+      ['Diunduh', tanggalIndo(new Date().toISOString())]
+    ];
+
+    const peserta = [KEPALA_PESERTA];
+    hasilUrut.forEach((p, n) => peserta.push(barisPeserta(p, n)));
+
+    const pengumpul = new Map(g.hasil.map(p => [emailKunciDari(p), p]));
+    const hadir = [['No', 'Nama', 'Email', 'No. Telepon', 'Pemda', 'Provinsi', 'Masuk Sesi', 'Status', 'Nilai', 'Poin']];
+    [...g.hadir.entries()]
+      .sort((x, y) => String(x[1].nama || '').localeCompare(String(y[1].nama || ''), 'id'))
+      .forEach(([e, h], n) => {
+        const p = pengumpul.get(e);
+        hadir.push([n + 1, h.nama || '', h.email || '', h.telepon || teleponAkun.get(e) || '',
+          h.instansi || '', h.provinsi || '', h.masuk ? tanggalIndo(h.masuk) : '',
+          p ? 'Mengumpulkan' : 'Belum mengumpulkan', p ? p.skor : '', p ? (p.poin || 0) : '']);
+      });
+
+    const waktu = [['Kode Soal', 'Pertanyaan', 'Muncul', 'Benar', '% Benar',
+      'Rata-rata (detik)', 'Tercepat (detik)', 'Terlama (detik)', 'Habis Waktu']];
+    for (const b of rekapButir(g.hasil).sort((x, y) => (y.rata || 0) - (x.rata || 0))) {
+      waktu.push([b.id, b.q, b.muncul, b.tepat, b.persen, b.rata, b.tercepat, b.terlama, b.habis]);
+    }
+
+    const sheets = [
+      { nama: 'Ringkasan', baris: ringkas },
+      { nama: 'Peserta', baris: peserta },
+      { nama: 'Kehadiran', baris: hadir },
+      { nama: 'Waktu Soal', baris: waktu },
+      { nama: 'Rincian Jawaban', baris: barisRincian(hasilUrut) }
+    ];
+    const bersih = (t) => String(t || '').replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+    window.XLSX.unduh(`rekap-${g.jenis}-${bersih(g.kode)}-${bersih(g.token) || 'tanpa-token'}-` +
+      `${new Date().toISOString().slice(0, 10)}.xlsx`, sheets);
+  }
+
   /* Baris peserta yang dipakai bersama oleh CSV dan Excel. */
   const KEPALA_PESERTA = [
-    'Peringkat', 'Nama', 'Email', 'Pemda', 'Provinsi', 'Jabatan',
+    'Peringkat', 'Nama', 'Email', 'No. Telepon', 'Pemda', 'Provinsi', 'Jabatan',
     'Jenis Tes', 'Kode Sesi', 'Token', 'Judul Sesi',
     'Poin', 'Nilai', 'Benar', 'Total Soal', 'Beruntun',
     'Durasi (detik)', 'Durasi', 'Rata-rata per Soal (detik)', 'Waktu Selesai'
   ];
 
   const barisPeserta = (p, n) => [
-    n + 1, p.nama, p.email, p.instansi,
+    n + 1, p.nama, p.email, p.telepon || teleponAkun.get(emailKunciDari(p)) || '', p.instansi,
     p.provinsi || provinsiDari(p.instansi), p.jabatan || '',
     infoJenis(p.jenisTes).label, p.sesiKode || '', tokenDari(p) || '', p.sesiJudul || '',
     p.poin || 0, p.skor, p.benar, p.total, p.beruntunMaks || 0,
@@ -1965,6 +2435,29 @@
     p.total ? Math.round((p.durasiDetik || 0) / p.total) : '',
     tanggalIndo(p.waktuSelesai)
   ];
+
+  function barisRincian(daftar) {
+    const rinci = [[
+      'Token', 'Jenis Tes', 'Nama', 'Email', 'Pemda',
+      'Nomor Soal', 'Kode Soal', 'Pertanyaan', 'Jawaban Peserta', 'Kunci', 'Hasil',
+      'Waktu (detik)', 'Poin'
+    ]];
+    for (const p of daftar) {
+      (p.jawaban || []).forEach((r, i) => {
+        const s = soalDari(r.id);
+        rinci.push([
+          tokenDari(p) || '', infoJenis(p.jenisTes).label, p.nama, p.email, p.instansi,
+          r.urut || (i + 1), r.id, s ? s.q : '',
+          s && r.pilih >= 0 ? s.o[r.pilih] : (r.pilih < 0 ? '(tidak dijawab)' : ''),
+          s ? s.o[s.a] : '',
+          r.benar ? 'Benar' : (r.pilih < 0 ? 'Habis waktu' : 'Salah'),
+          r.detik == null ? '' : r.detik,
+          r.poin || 0
+        ]);
+      });
+    }
+    return rinci;
+  }
 
   function unduhCsv(daftar) {
     const baris = [KEPALA_PESERTA];
@@ -2056,26 +2549,7 @@
     }
 
     // 3. Satu sheet panjang: waktu tiap peserta pada tiap soal
-    const rinci = [[
-      'Token', 'Jenis Tes', 'Nama', 'Email', 'Pemda',
-      'Nomor Soal', 'Kode Soal', 'Pertanyaan', 'Jawaban Peserta', 'Kunci', 'Hasil',
-      'Waktu (detik)', 'Poin'
-    ]];
-    for (const p of semua) {
-      (p.jawaban || []).forEach((r, i) => {
-        const s = soalDari(r.id);
-        rinci.push([
-          tokenDari(p) || '', infoJenis(p.jenisTes).label, p.nama, p.email, p.instansi,
-          r.urut || (i + 1), r.id, s ? s.q : '',
-          s && r.pilih >= 0 ? s.o[r.pilih] : (r.pilih < 0 ? '(tidak dijawab)' : ''),
-          s ? s.o[s.a] : '',
-          r.benar ? 'Benar' : (r.pilih < 0 ? 'Habis waktu' : 'Salah'),
-          r.detik == null ? '' : r.detik,
-          r.poin || 0
-        ]);
-      });
-    }
-    sheets.push({ nama: 'Rincian Jawaban', baris: rinci });
+    sheets.push({ nama: 'Rincian Jawaban', baris: barisRincian(semua) });
 
     window.XLSX.unduh(`rekap-tes-emondak-${new Date().toISOString().slice(0, 10)}.xlsx`, sheets);
   }

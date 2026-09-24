@@ -39,7 +39,10 @@
       if (this.siap) return this.mode;
       const cfg = window.FIREBASE_CONFIG || {};
       const daring = location.protocol === 'http:' || location.protocol === 'https:';
-      if (cfg.apiKey && cfg.projectId && daring) {
+      // ?lokal di alamat memaksa mode lokal walau Firebase tersedia — untuk
+      // gladi bersih dan uji tampilan tanpa menulis ke Firestore sungguhan.
+      const paksaLokal = new URLSearchParams(location.search).has('lokal');
+      if (cfg.apiKey && cfg.projectId && daring && !paksaLokal) {
         try {
           const [{ initializeApp }, fs, auth] = await Promise.all([
             import(`${V}/firebase-app.js`),
@@ -124,6 +127,7 @@
         instansi: akun.instansi,
         provinsi: akun.provinsi || '',
         jabatan: akun.jabatan || '',
+        telepon: akun.telepon || '',
         dibuat: akun.dibuat || new Date().toISOString()
       };
       if (this.mode === 'firebase') {
@@ -135,6 +139,57 @@
         this._tulis(KUNCI_AKUN, semua);
       }
       return { id, ...isi };
+    },
+
+    /* Catatan kehadiran: peserta yang tokennya diterima di lobi dicatat
+       pada dokumen akunnya sendiri, di peta `ikut`. Kuncinya satu sesi
+       (kode + jenis tes + token), jadi sesudah sesi dihentikan panitia
+       bisa membandingkan siapa yang masuk dengan siapa yang benar-benar
+       mengumpulkan. Sengaja menumpang di pretestAkun — aturan Firestore
+       koleksi itu sudah mengizinkan peserta memperbarui dokumennya, jadi
+       tidak perlu koleksi dan aturan baru. */
+    async catatIkut(akun, kunci, info) {
+      await this.init();
+      const id = idAkun(akun.email);
+      const isi = {
+        nama: akun.nama,
+        email: akun.email,
+        emailKunci: String(akun.email).trim().toLowerCase(),
+        instansi: akun.instansi,
+        ikut: { [kunci]: { waktu: new Date().toISOString(), ...(info || {}) } }
+      };
+      if (this.mode === 'firebase') {
+        const { doc, setDoc } = this._fs;
+        await setDoc(doc(this._db, 'pretestAkun', id), isi, { merge: true });
+        return;
+      }
+      const semua = this._baca(KUNCI_AKUN, {});
+      const lama = semua[id] || {};
+      semua[id] = { ...lama, ...isi, ikut: { ...(lama.ikut || {}), ...isi.ikut } };
+      this._tulis(KUNCI_AKUN, semua);
+    },
+
+    // Daftar akun yang selalu segar — dipakai rekap per sesi di Ruang Admin.
+    pantauAkun(saatBerubah) {
+      let hidup = true;
+      this.init().then(() => {
+        if (!hidup) return;
+        if (this.mode === 'firebase') {
+          const { collection, onSnapshot } = this._fs;
+          this._lepasAkun = onSnapshot(collection(this._db, 'pretestAkun'),
+            snap => saatBerubah(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            e => console.warn('[data] pantau akun gagal:', e));
+        } else {
+          const tik = () => saatBerubah(Object.entries(this._baca(KUNCI_AKUN, {})).map(([id, a]) => ({ id, ...a })));
+          tik();
+          this._jamAkun = setInterval(tik, 2000);
+        }
+      });
+      return () => {
+        hidup = false;
+        if (this._lepasAkun) { this._lepasAkun(); this._lepasAkun = null; }
+        if (this._jamAkun) { clearInterval(this._jamAkun); this._jamAkun = null; }
+      };
     },
 
     async jumlahAkun() {
