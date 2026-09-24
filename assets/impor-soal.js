@@ -193,9 +193,9 @@
       if (!kini) return;
       const butir = kini;
       kini = null;
-      if (!butir.q) { catatan.push('Ada pilihan jawaban tanpa pertanyaan — dilewati.'); return; }
+      if (!butir.q) { catatan.push('Ada pilihan jawaban tanpa pertanyaan, dilewati.'); return; }
       if (butir.o.length < 2) {
-        catatan.push(`"${butir.q.slice(0, 60)}…" hanya punya ${butir.o.length} pilihan — dilewati.`);
+        catatan.push(`"${butir.q.slice(0, 60)}…" hanya punya ${butir.o.length} pilihan, dilewati.`);
         return;
       }
       if (butir.o.length > 4) {
@@ -232,7 +232,7 @@
     for (const s of soal) {
       if (!(s.a >= 0 && s.a < s.o.length)) {
         s.a = -1;
-        catatan.push(`Kunci jawaban "${s.q.slice(0, 60)}…" tidak terbaca — pilih sendiri pada pratinjau.`);
+        catatan.push(`Kunci jawaban "${s.q.slice(0, 60)}…" tidak terbaca. Pilih sendiri pada pratinjau.`);
       }
     }
 
@@ -288,7 +288,7 @@
     for (let i = n - 22; i >= Math.max(0, n - 66000); i--) {
       if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
     }
-    if (eocd < 0) throw new Error('Berkas ini bukan .docx yang sah — daftar isi ZIP tidak ditemukan.');
+    if (eocd < 0) throw new Error('Berkas ini bukan .docx yang sah: daftar isi ZIP tidak ditemukan.');
 
     const jumlah = dv.getUint16(eocd + 10, true);
     let p = dv.getUint32(eocd + 16, true);
@@ -309,7 +309,7 @@
       }
       p += 46 + panjangNama + panjangExtra + panjangKet;
     }
-    if (!masuk) throw new Error('word/document.xml tidak ada di dalam berkas — pastikan ini .docx, bukan .doc lama.');
+    if (!masuk) throw new Error('word/document.xml tidak ada di dalam berkas. Pastikan ini .docx, bukan .doc lama.');
 
     const lokal = masuk.offset;
     if (dv.getUint32(lokal, true) !== 0x04034b50) throw new Error('Susunan berkas .docx tidak dikenali.');
@@ -360,7 +360,7 @@
         const pilihan = Array.isArray(s.o) ? s.o.map(kosongkan).filter(Boolean).slice(0, 4) : [];
         const tanya = kosongkan(s.q);
         if (!tanya || pilihan.length < 2) {
-          catatan.push('Satu butir pada berkas JSON tidak lengkap — dilewati.');
+          catatan.push('Satu butir pada berkas JSON tidak lengkap, dilewati.');
           continue;
         }
         soal.push({

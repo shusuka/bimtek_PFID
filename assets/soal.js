@@ -28,7 +28,7 @@ window.SOAL_PRETEST = [
         "Mengakses halaman website Portal FID > SIPDJD",
         "Mengirimkan formulir permohonan akses data secara fisik setiap kali ingin membuka aplikasi",
         "Mengunduh aplikasi eMonitoring DAK terlebih dahulu melalui Google Play Store atau App Store di smartphone masing-masing"], a: 0,
-    bahas: "eMonDAK dibuka lewat peramban dari Portal FID, menu eMonDAK — bukan SIPDJD, dan tidak ada aplikasi ponsel yang perlu diunduh." },
+    bahas: "eMonDAK dibuka lewat peramban dari Portal FID, menu eMonDAK (bukan SIPDJD), dan tidak ada aplikasi ponsel yang perlu diunduh." },
 
   { id: "p02",
     q: "Dua data (credentials) apa yang wajib diisi pada form Login portal depan eMonDAK?",
@@ -44,7 +44,7 @@ window.SOAL_PRETEST = [
         "Dashboard Utama",
         "Menu Tenaga Kerja",
         "Menu Realisasi Keuangan"], a: 0,
-    bahas: "Seluruh tahapan pemilihan penyedia — persiapan, tender, sampai kontrak — dilaporkan pada menu Status PBJ." },
+    bahas: "Seluruh tahapan pemilihan penyedia (persiapan, tender, sampai kontrak) dilaporkan pada menu Status PBJ." },
 
   { id: "p04",
     q: "Pada fitur apa Anda disarankan untuk rutin melakukan pembaharuan demi menjaga keamanan akun eMonDAK Anda?",
@@ -116,7 +116,7 @@ window.SOAL_PRETEST = [
         "Rencana Anggaran Biaya (RAB)",
         "Kuitansi pembelian material",
         "Estimasi/tebakan kontraktor"], a: 0,
-    bahas: "Realisasi keuangan adalah uang yang benar-benar cair, dibuktikan dengan SP2D — bukan rencana atau perkiraan." },
+    bahas: "Realisasi keuangan adalah uang yang benar-benar cair, dibuktikan dengan SP2D, bukan rencana atau perkiraan." },
 
   { id: "p13",
     q: "Jika terjadi perubahan desain atau volume pekerjaan (adendum), dokumen apa yang wajib diunggah?",
@@ -180,7 +180,8 @@ window.SOAL_PRETEST = [
         "Nama lengkap seluruh tukang bangunan",
         "Besar gaji harian mandor",
         "Daftar hadir PNS di dinas"], a: 0,
-    bahas: "Yang dilaporkan adalah jumlah tenaga kerja yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." },
+    bahas: "Yang dilaporkan adalah jumlah tenaga kerja yang terserap, sebagai indikator manfaat ekonomi DAK di daerah." }
+,
 
   /* ── Bagian anti korupsi ───────────────────────────────────────────
      Sumber : "SOAL PRE TEST EMONDAK New (1).docx" — bagian "PERTANYAAN
@@ -210,7 +211,7 @@ window.SOAL_PRETEST = [
         "Gratifikasi yang boleh diterima",
         "Hadiah biasa",
         "Sumbangan sosial"], a: 0,
-    bahas: "Ada maksud memengaruhi keputusan jabatan, jadi perbuatan itu suap — bukan hadiah dan bukan gratifikasi yang boleh diterima." },
+    bahas: "Ada maksud memengaruhi keputusan jabatan, jadi perbuatan itu suap, bukan hadiah dan bukan gratifikasi yang boleh diterima." },
 
   { id: "k04",
     q: "Menurut Peraturan KPK terbaru, berapa batas nilai kado pernikahan yang tidak wajib dilaporkan dari setiap pemberi?",

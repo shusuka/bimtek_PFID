@@ -77,14 +77,8 @@ a:hover { color: var(--biru-tua); }
 .hero .lapis-langit, .hero .lapis-awan, .hero .lapis-grid,
 .hero .cahaya-bawah, .hero .bintang { display: none; }
 
-/* kisi titik halus di belakang, memudar ke tepi */
-.hero::after {
-  top: 0; left: 0; width: 100%; height: 100%; aspect-ratio: auto;
-  transform: none; opacity: 1;
-  background: radial-gradient(rgba(15, 45, 92, .10) 1px, transparent 1.2px) 0 0 / 22px 22px;
-  mask-image: radial-gradient(ellipse 70% 60% at 60% 40%, #000 20%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 60% 40%, #000 20%, transparent 75%);
-}
+/* cap air lambang eMonDAK milik tampilan klasik tidak dipakai di sini */
+.hero::after { content: none; }
 
 .navbar { max-width: 1240px; width: 100%; margin: 0 auto; }
 .nav-kanan { font-size: 14.5px; }
@@ -227,10 +221,10 @@ a:hover { color: var(--biru-tua); }
              ubinMiniSorot .5s 2.6s var(--e-pegas) forwards;
   animation-delay: calc(.25s + var(--i) * 70ms), 2.6s;
 }
-.ubin-mini.merah  { background: #d9434f; }
+.ubin-mini.merah  { background: #c42f3c; }
 .ubin-mini.biru   { background: #2463c4; }
 .ubin-mini.kuning { background: #e8a70f; color: #1f1604; }
-.ubin-mini.hijau  { background: #1c9a5d; }
+.ubin-mini.hijau  { background: #15784a; }
 @keyframes ubinMiniMasuk {
   from { opacity: 0; transform: translateY(8px) scale(.97); filter: blur(3px); }
   to   { opacity: 1; transform: none; filter: blur(0); }
@@ -495,10 +489,10 @@ h2.judul-halaman { letter-spacing: -0.02em; }
 .ubin.kuning .bentuk { background: rgba(31, 22, 4, .12); }
 .ubin:hover { transform: translateY(-2px); }
 .ubin:active { transform: translateY(3px) scale(.99); box-shadow: 0 2px 0 0 rgba(15, 45, 92, .18); }
-.ubin.merah  { background: #d9434f; }
+.ubin.merah  { background: #c42f3c; }
 .ubin.biru   { background: #2463c4; }
 .ubin.kuning { background: #e8a70f; color: #1f1604; }
-.ubin.hijau  { background: #1c9a5d; }
+.ubin.hijau  { background: #15784a; }
 @keyframes ubinMasuk {
   from { opacity: 0; transform: translateY(14px) scale(.98); filter: blur(4px); }
   to   { opacity: 1; transform: none; filter: blur(0); }
@@ -588,7 +582,7 @@ h2.judul-halaman { letter-spacing: -0.02em; }
 .tabel-bungkus { border-radius: 18px; border-color: var(--garis); box-shadow: var(--bayang); }
 table.tabel th {
   background: #f1f4f9; color: var(--teks-lembut);
-  letter-spacing: .04em; font-size: 11.5px;
+  text-transform: none; letter-spacing: 0; font-size: 12.5px;
 }
 table.tabel tbody tr { transition: background .12s ease; }
 table.tabel tbody tr:hover { background: #f5f8fd; }
@@ -612,11 +606,14 @@ table.tabel tbody tr:hover { background: #f5f8fd; }
   40%  { box-shadow: 0 0 0 6px rgba(243, 179, 26, .35), var(--bayang); }
   to   { box-shadow: 0 0 0 3px rgba(243, 179, 26, .28), var(--bayang); }
 }
+.rekap-status { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
 .rekap-judul { font-weight: 800; letter-spacing: -0.01em; }
 .rekap-angka > div { border-radius: 12px; background: #f4f7fb; }
 .rekap-angka b { font-weight: 800; }
 .rekap-angka span { letter-spacing: 0; font-weight: 600; font-size: 12.5px; }
 .rekap-angka .sorot { background: #fff6dc; }
+
+.pita-lokal { text-transform: none; letter-spacing: 0; font-size: 12px; border-radius: 10px; }
 
 /* ── pilihan tampilan ── */
 .pilih-tampilan {

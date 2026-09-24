@@ -159,9 +159,9 @@
   }
 
   function tanggalIndo(iso) {
-    if (!iso) return '—';
+    if (!iso) return '-';
     const d = new Date(iso);
-    if (isNaN(d)) return '—';
+    if (isNaN(d)) return '-';
     return d.toLocaleString('id-ID', {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
@@ -493,8 +493,8 @@
         <h1 class="judul-halaman">Empat langkah, <em>dikerjakan serentak</em></h1>
         <p class="ket-halaman">
           Tes ini mengukur pemahaman Anda tentang aplikasi eMonitoring DAK. Ada dua kali
-          pengambilan dengan bank soal yang sama — <b>pre-test</b> sebelum materi bimtek dan
-          <b>post-test</b> sesudahnya — supaya perubahan pemahaman satu kelas terlihat.
+          pengambilan dengan bank soal yang sama: <b>pre-test</b> sebelum materi bimtek dan
+          <b>post-test</b> sesudahnya, supaya perubahan pemahaman satu kelas terlihat.
           Tidak ada nilai minimal kelulusan.
         </p>
 
@@ -503,7 +503,7 @@
         </div>
 
         <ol class="langkah" style="margin-top:22px">
-          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi — email Anda yang menjadi penanda peserta, dan akun yang sama dipakai lagi pada post-test.
+          <li><strong>Buat akun daerah</strong>Sekali saja: nama, email, dan instansi asal. Tanpa kata sandi: email Anda yang menjadi penanda peserta, dan akun yang sama dipakai lagi pada post-test.
             <span class="catatan-hadiah">Pastikan alamat email yang diisi sudah benar dan aktif, karena akan ada voucher menarik bagi 3 besar pemenang.</span></li>
           <li><strong>Tunggu di lobi</strong>Masukkan token sesi yang dibagikan panitia, lalu tunggu sampai seluruh peserta masuk. Token hanya berlaku pada jendela waktu yang dibuka admin.</li>
           <li><strong>Tekan Kerjakan bersama-sama</strong>Sesudah aba-aba panitia, tekan tombol Kerjakan. Ada hitung mundur ${Number(K.detikAbaAba || 5)} detik supaya satu kelas mulai pada detik yang sama.</li>
@@ -511,8 +511,8 @@
         </ol>
 
         <p class="ket-halaman" style="margin-top:22px">
-          Satu email hanya dapat mengerjakan <b>satu kali per sesi untuk tiap jenis tes</b> —
-          sudah ikut pre-test tidak menghalangi Anda ikut post-test. Bila terjadi kendala,
+          Satu email hanya dapat mengerjakan <b>satu kali per sesi untuk tiap jenis tes</b>.
+          Sudah ikut pre-test tidak menghalangi Anda ikut post-test. Bila terjadi kendala,
           hubungi panitia lewat halaman <a href="#/bantuan">Bantuan</a>.
         </p>
         <a class="btn btn-kuning" href="#/akun">${akun ? 'Lanjut ke lobi' : 'Buat akun sekarang'}</a>
@@ -538,7 +538,7 @@
       <div class="label-sudut" style="margin:0 0 10px">Aturan Pengerjaan</div>
       <p class="ket-halaman" style="margin:0 0 16px">
         Sesi yang sedang disiapkan panitia: <b>${aman(info.panjang)}</b>${
-          s.judul ? ' — ' + aman(s.judul) : ''}. ${aman(info.ket || '')}
+          s.judul ? ' (' + aman(s.judul) + ')' : ''}. ${aman(info.ket || '')}
       </p>
       <div class="grid-statistik" style="margin:0">
         <div class="statistik sorot"><div class="angka">${jumlah}</div><div class="nama">Jumlah soal</div></div>
@@ -547,7 +547,7 @@
       </div>
       <p class="ket-halaman" style="margin:16px 0 0">
         Setiap soal punya hitung mundurnya sendiri selama <b>${aman(perSoal)}</b>. Begitu waktu satu
-        soal habis, layar berpindah sendiri ke soal berikutnya dan soal itu dihitung tidak dijawab —
+        soal habis, layar berpindah sendiri ke soal berikutnya dan soal itu dihitung tidak dijawab,
         jadi seluruh ${jumlah} soal selesai paling lama ${mmss(total)}.
       </p>`;
   }
@@ -581,7 +581,7 @@
             <div class="kolom">
               <label for="fEmail">Email aktif</label>
               <input id="fEmail" name="email" type="email" autocomplete="email" placeholder="nama@instansi.go.id" required />
-              <span class="petunjuk">Penanda peserta — dipakai lagi pada post-test.</span>
+              <span class="petunjuk">Penanda peserta, dipakai lagi pada post-test.</span>
               <span class="catatan-hadiah">Pastikan alamat email yang diisi sudah benar dan aktif, karena akan ada voucher menarik bagi 3 besar pemenang.</span>
             </div>
             <div id="isianBaru" hidden>
@@ -603,7 +603,7 @@
                          placeholder="ketik nama kabupaten/kota, mis. Karo" />
                   <div class="pilih-daftar" id="daftarPemda" role="listbox" hidden></div>
                 </div>
-                <span class="petunjuk">Pilih dari daftar — 514 kabupaten/kota dan 38 provinsi se-Indonesia.</span>
+                <span class="petunjuk">Pilih dari daftar: 514 kabupaten/kota dan 38 provinsi se-Indonesia.</span>
               </div>
               <div class="kolom" id="kolomJabatan" style="margin-top:16px">
                 <label for="fJabatan">Jabatan <span style="text-transform:none;letter-spacing:0">(boleh dikosongkan)</span></label>
@@ -811,7 +811,7 @@
       kotak.innerHTML = kepala + `
         <div class="lampu lampu-tutup"><span></span> ${aman(st.teks)}</div>
         <p class="ket-halaman" style="margin:14px 0 0">
-          Biarkan halaman ini terbuka — begitu panitia membuka sesi, layar akan berubah sendiri.
+          Biarkan halaman ini terbuka. Begitu panitia membuka sesi, layar akan berubah sendiri.
         </p>`;
       return;
     }
@@ -827,7 +827,7 @@
       kotak.innerHTML = kepala + `
         <div class="lampu lampu-tunggu"><span></span> Sesi dibuka sebentar lagi</div>
         <div class="mundur-besar" id="lobiMundur">${hitungMundurPanjang(st.sisaMulai)}</div>
-        <p class="ket-halaman" style="margin:6px 0 0">Bersiap — layar ujian terbuka otomatis.</p>`;
+        <p class="ket-halaman" style="margin:6px 0 0">Bersiap, layar ujian terbuka otomatis.</p>`;
       return;
     }
 
@@ -931,7 +931,7 @@
             <div class="statistik"><div class="angka">${mmss(jumlah * (main.detikPerSoal || 30))}</div><div class="nama">Total maksimal</div></div>
           </div>
           <ul class="daftar-siap">
-            <li>Satu layar satu soal — jawaban tidak bisa diubah setelah dipilih.</li>
+            <li>Satu layar satu soal. Jawaban tidak bisa diubah setelah dipilih.</li>
             <li>Makin cepat menjawab benar, makin besar poinnya.</li>
             <li>Jangan tutup halaman; bila tertutup, buka lagi alamat yang sama.</li>
           </ul>
@@ -1265,7 +1265,7 @@
           ${aman(h.instansi)} · ${aman(h.sesiJudul || '')} · ${aman(tanggalIndo(h.waktuSelesai))}
         </p>
 
-        ${h.sebabSelesai === 'waktu-sesi' ? '<div class="pesan pesan-info" style="margin-bottom:18px">Jendela waktu sesi berakhir — lembar jawaban dikumpulkan otomatis.</div>' : ''}
+        ${h.sebabSelesai === 'waktu-sesi' ? '<div class="pesan pesan-info" style="margin-bottom:18px">Jendela waktu sesi berakhir, jadi lembar jawaban dikumpulkan otomatis.</div>' : ''}
         ${h.tersimpan ? '' : '<div class="pesan pesan-galat" style="margin-bottom:18px">Nilai Anda gagal dikirim ke server (jaringan bermasalah). Tunjukkan layar ini ke panitia sebelum menutup halaman.</div>'}
 
         <div class="kartu" style="text-align:center">
@@ -1351,8 +1351,8 @@
                 <tr>
                   <td class="peringkat-nomor">${n + 1}</td>
                   <td>${aman(r.id)}</td>
-                  <td class="bebas">${aman(s ? s.q : '—')}</td>
-                  <td class="angka">${d == null ? '—' : d + ' dtk'}</td>
+                  <td class="bebas">${aman(s ? s.q : '-')}</td>
+                  <td class="angka">${d == null ? '-' : d + ' dtk'}</td>
                   <td>${r.benar
                     ? '<span class="tanda benar">Benar</span>'
                     : (r.pilih < 0 ? '<span class="tanda habis">Waktu habis</span>' : '<span class="tanda salah">Salah</span>')}</td>
@@ -1409,7 +1409,7 @@
       <div class="wadah">
         <div class="label-sudut">Papan Peringkat</div>
         <h1 class="judul-halaman">Papan <em>juara</em> ${aman(String(K.tahun || ''))}</h1>
-        <p class="ket-halaman">Urutan disusun dari poin tertinggi — jawaban benar yang cepat dan beruntun naik lebih tinggi.</p>
+        <p class="ket-halaman">Urutan disusun dari poin tertinggi: jawaban benar yang cepat dan beruntun naik lebih tinggi.</p>
         <div id="isiPeringkat" class="kosong">Memuat data…</div>
       </div>`;
 
@@ -1442,6 +1442,7 @@
         ? terakhir.filter(p => p.sesiKode === kodeSesi &&
             (!jenisSesi || jenisSah(p.jenisTes) === jenisSesi))
         : terakhir;
+      kotak.classList.remove('kosong');
       kotak.innerHTML = isiPapan(urutkan(saring), sesi);
     };
 
@@ -1477,7 +1478,7 @@
     }).join('');
 
     return judulSesi + `
-      <div class="podium">${mimbar}</div>
+      <div class="podium isi-${tigaBesar.length}">${mimbar}</div>
       <div class="tabel-bungkus">
         <table class="tabel">
           <thead>
@@ -1588,8 +1589,8 @@
 
         <h2 class="judul-halaman" style="font-size:20px;margin:34px 0 6px">Bank soal</h2>
         <p class="ket-halaman">
-          Soal yang diundikan ke peserta. Bila penyelenggara mengirim revisi, masukkan di sini —
-          berlaku seketika untuk semua peserta, tanpa perlu memasang ulang aplikasi.
+          Soal yang diundikan ke peserta. Bila penyelenggara mengirim revisi, masukkan di sini.
+          Berlaku seketika untuk semua peserta, tanpa perlu memasang ulang aplikasi.
         </p>
         <div class="kartu" id="kartuBank"><div class="kosong">Memuat bank soal…</div></div>
 
@@ -1604,7 +1605,7 @@
         </p>
         <div class="kartu kartu-bahaya" id="kartuBahaya">
           <div class="baris-tombol">
-            <button class="btn btn-bahaya" id="btnResetUji">Reset masa uji coba — hapus semua pendaftar &amp; nilai</button>
+            <button class="btn btn-bahaya" id="btnResetUji">Reset masa uji coba: hapus semua pendaftar &amp; nilai</button>
           </div>
           <p class="ket-halaman" style="margin:12px 0 18px">
             Dipakai selama uji coba: seluruh akun yang sudah mendaftar dan seluruh nilai dibuang
@@ -1705,7 +1706,7 @@
       const ketik = prompt('Ketik "' + kataKunci + '" untuk memastikan:');
       if (ketik === null) return;
       if (samakan(ketik) !== samakan(kataKunci)) {
-        pesan.innerHTML = '<div class="pesan pesan-info">Dibatalkan — kata kuncinya tidak cocok.</div>';
+        pesan.innerHTML = '<div class="pesan pesan-info">Dibatalkan, kata kuncinya tidak cocok.</div>';
         return;
       }
       const teksAsli = tombol.textContent;
@@ -1814,8 +1815,8 @@
     const maks = maksButir();
     const lampu = { buka: 'lampu-buka', menunggu: 'lampu-tunggu' }[st.keadaan] || 'lampu-tutup';
     const ket = {
-      buka: 'Sesi TERBUKA — peserta bisa masuk dengan token',
-      menunggu: 'Terjadwal — menunggu waktu mulai',
+      buka: 'Sesi TERBUKA, peserta bisa masuk dengan token',
+      menunggu: 'Terjadwal, menunggu waktu mulai',
       lewat: 'Waktu sesi sudah lewat',
       tutup: 'Sesi tertutup',
       kosong: 'Belum ada sesi'
@@ -1871,7 +1872,7 @@
         <div class="kolom">
           <label for="sJumlah">Jumlah soal (maks. ${maks})</label>
           <input id="sJumlah" type="number" min="5" max="${maks}" value="${Math.min(Number(s.jumlahSoal || 25), maks)}" />
-          <span class="petunjuk">Batasnya ${maks} — sebanyak grup soal unik di bank.
+          <span class="petunjuk">Batasnya ${maks}, sebanyak grup soal unik di bank.
             Tambah butir lewat "Bank soal" di bawah bila perlu lebih banyak.</span>
         </div>
         <div class="kolom">
@@ -1883,7 +1884,7 @@
         <div class="kolom kolom-lebar">
           <label class="centang">
             <input id="sPoinCepat" type="checkbox" ${s.poinCepat !== false ? 'checked' : ''} />
-            <span>Poin kecepatan — makin cepat menjawab, makin besar poinnya</span>
+            <span>Poin kecepatan: makin cepat menjawab, makin besar poinnya</span>
           </label>
         </div>
         <div class="kolom-lebar baris-tombol">
@@ -2013,7 +2014,7 @@
     if (saringToken && saringToken !== '*' && !hitungToken.has(saringToken)) hitungToken.set(saringToken, 0);
     const pilihanToken = [...hitungToken.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-    let jumlahAkun = rekapAkun ? rekapAkun.length : '—';
+    let jumlahAkun = rekapAkun ? rekapAkun.length : '-';
     if (!rekapAkun) {
       try { jumlahAkun = await window.DB.jumlahAkun(); } catch { /* biarkan */ }
     }
@@ -2035,11 +2036,11 @@
         <div class="kolom" style="max-width:320px;margin:0">
           <label for="saringSesi">Tampilkan</label>
           <select id="saringSesi">
-            <option value=""${saringToken === '' ? ' selected' : ''}>Sesi berjalan${kode ? ' — ' + aman(kode) : ''}</option>
+            <option value=""${saringToken === '' ? ' selected' : ''}>Sesi berjalan${kode ? ' (' + aman(kode) + ')' : ''}</option>
             <option value="*"${saringToken === '*' ? ' selected' : ''}>Seluruh riwayat (semua angkatan)</option>
             ${pilihanToken.map(([t, j]) => `
               <option value="${aman(t)}"${saringToken === t ? ' selected' : ''}>Token ${aman(t)}${
-                  t === tokenSesi ? ' (sesi berjalan)' : ''} — ${j ? j + ' peserta' : 'belum ada peserta'}</option>`).join('')}
+                  t === tokenSesi ? ' (sesi berjalan)' : ''}: ${j ? j + ' peserta' : 'belum ada peserta'}</option>`).join('')}
           </select>
           <span class="petunjuk">Rekap Excel selalu memisahkan tiap token menjadi sheet sendiri.</span>
         </div>
@@ -2076,16 +2077,16 @@
                 <td class="peringkat-nomor">${i + 1}</td>
                 <td class="bebas">${aman(p.nama)}</td>
                 <td>${aman(p.email)}</td>
-                <td class="mono">${aman(p.telepon || teleponAkun.get(emailKunciDari(p)) || '—')}</td>
+                <td class="mono">${aman(p.telepon || teleponAkun.get(emailKunciDari(p)) || '-')}</td>
                 <td class="bebas">${aman(p.instansi)}</td>
                 <td>${aman(p.provinsi || provinsiDari(p.instansi))}</td>
                 <td><span class="lencana-jenis kecil ${jenisSah(p.jenisTes)}">${aman(infoJenis(p.jenisTes).label)}</span></td>
-                <td class="mono">${aman(tokenDari(p) || '—')}</td>
+                <td class="mono">${aman(tokenDari(p) || '-')}</td>
                 <td class="angka tegas-kuning">${angkaRapi(p.poin || 0)}</td>
                 <td class="angka">${p.skor}</td>
                 <td class="angka">${p.benar}/${p.total}</td>
                 <td class="angka">${mmss(p.durasiDetik)}</td>
-                <td class="angka">${p.total ? Math.round((p.durasiDetik || 0) / p.total) + ' dtk' : '—'}</td>
+                <td class="angka">${p.total ? Math.round((p.durasiDetik || 0) / p.total) + ' dtk' : '-'}</td>
                 <td>${aman(tanggalIndo(p.waktuSelesai))}</td>
                 <td><button class="tombol-hapus" data-hapus="${aman(p.id)}" data-nama="${aman(p.nama)}"
                         title="Hapus rekaman ini">✕</button></td>
@@ -2107,7 +2108,7 @@
 
       ${window.DB.mode === 'lokal'
         ? `<div class="pesan pesan-info" style="margin-top:22px">
-             Aplikasi sedang berjalan dalam mode lokal — data di atas hanya milik peramban ini.
+             Aplikasi sedang berjalan dalam mode lokal, data di atas hanya milik peramban ini.
              <button class="btn btn-hantu" id="btnBersih" style="margin-left:10px">Bersihkan data lokal</button>
            </div>`
         : ''}`;
@@ -2206,9 +2207,9 @@
                 <td class="angka">${b.muncul}</td>
                 <td class="angka">${b.tepat}</td>
                 <td class="angka ${b.persen < 50 ? 'buruk' : 'baik'}">${b.persen}%</td>
-                <td class="angka tegas">${b.rata == null ? '—' : b.rata + ' dtk'}</td>
-                <td class="angka">${b.tercepat == null ? '—' : b.tercepat + ' dtk'}</td>
-                <td class="angka">${b.terlama == null ? '—' : b.terlama + ' dtk'}</td>
+                <td class="angka tegas">${b.rata == null ? '-' : b.rata + ' dtk'}</td>
+                <td class="angka">${b.tercepat == null ? '-' : b.tercepat + ' dtk'}</td>
+                <td class="angka">${b.terlama == null ? '-' : b.terlama + ' dtk'}</td>
                 <td class="angka">${b.habis}</td>
                 <td><span class="batang"><i style="width:${Math.round(((b.rata || 0) / maks) * 100)}%" class="${b.persen < 50 ? 'no' : 'ok'}"></i></span></td>
               </tr>`).join('')}
@@ -2326,7 +2327,7 @@
               <span class="lencana-jenis kecil ${g.jenis}">${aman(infoJenis(g.jenis).label)}</span>
               <span class="rekap-status ${berjalan ? 'jalan' : ''}">${label}</span>
               <div class="rekap-judul">${aman(g.judul || 'Tanpa judul')}</div>
-              <div class="rekap-rinci">Kode <b>${aman(g.kode)}</b> · token <b class="mono">${aman(g.token || '—')}</b>${
+              <div class="rekap-rinci">Kode <b>${aman(g.kode)}</b> · token <b class="mono">${aman(g.token || '-')}</b>${
                 g.terakhir ? ' · ' + aman(tanggalIndo(g.terakhir)) : ''}</div>
             </div>
             <button class="btn btn-kecil btn-kuning" data-unduh-sesi="${aman(g.kunci)}"
@@ -2336,8 +2337,8 @@
             <div><b>${a.masuk}</b><span>Masuk sesi</span></div>
             <div class="sorot"><b>${a.kumpul}</b><span>Mengumpulkan</span></div>
             <div${a.belum ? ' class="waspada"' : ''}><b>${a.belum}</b><span>Belum mengumpulkan</span></div>
-            <div><b>${a.rata == null ? '—' : a.rata}</b><span>Rata-rata nilai</span></div>
-            <div><b>${a.rataPoin == null ? '—' : angkaRapi(a.rataPoin)}</b><span>Rata-rata poin</span></div>
+            <div><b>${a.rata == null ? '-' : a.rata}</b><span>Rata-rata nilai</span></div>
+            <div><b>${a.rataPoin == null ? '-' : angkaRapi(a.rataPoin)}</b><span>Rata-rata poin</span></div>
           </div>
         </article>`;
     }).join('');
@@ -2372,7 +2373,7 @@
     const info = infoJenis(g.jenis);
 
     const ringkas = [
-      ['Rekap', info.label + ' — ' + (g.judul || 'tanpa judul')],
+      ['Rekap', info.label + ': ' + (g.judul || 'tanpa judul')],
       ['Jenis Tes', info.label],
       ['Kode Sesi', g.kode],
       ['Token', g.token || ''],
@@ -2569,7 +2570,7 @@
     if (!kotak) return;
     const maks = maksButir();
     const asal = bankInfo
-      ? 'Hasil impor panitia — ' + (bankInfo.sumber || 'tanpa nama berkas') +
+      ? 'Hasil impor panitia: ' + (bankInfo.sumber || 'tanpa nama berkas') +
         (bankInfo.diubah ? ' · ' + tanggalIndo(bankInfo.diubah) : '')
       : 'Bank bawaan aplikasi (assets/soal.js)';
 
@@ -2588,7 +2589,7 @@
           <input id="fBerkasSoal" type="file" accept=".docx,.json,.txt,.csv,.md" />
           <span class="petunjuk">
             .docx kiriman penyelenggara, .json cadangan aplikasi ini, atau .txt biasa.
-            Berkas dibaca di peramban ini saja — tidak diunggah ke mana pun.
+            Berkas dibaca di peramban ini saja, tidak diunggah ke mana pun.
           </span>
         </div>
         <div class="kolom">
@@ -2697,12 +2698,12 @@
 
     kotak.innerHTML = `
       <h3 class="judul-halaman" style="font-size:17px;margin:30px 0 6px">
-        Pratinjau — ${d.length} butir dari ${aman(imporKini.sumber || 'sumber tanpa nama')}
+        Pratinjau: ${d.length} butir dari ${aman(imporKini.sumber || 'sumber tanpa nama')}
       </h3>
       <p class="ket-halaman">
         ${baru} butir baru, ${d.length - baru} butir sudah ada di bank (id lamanya dipakai lagi
         supaya rekap nilai yang telanjur masuk tidak putus).
-        ${tanpaKunci ? `<b class="tegas">${tanpaKunci} butir belum punya kunci</b> — pilih dulu pada kolom Kunci.` : ''}
+        ${tanpaKunci ? `<b class="tegas">${tanpaKunci} butir belum punya kunci</b>. Pilih dulu pada kolom Kunci.` : ''}
       </p>
       ${imporKini.catatan.length ? `
         <div class="pesan pesan-info">
@@ -2716,7 +2717,7 @@
       <div class="kolom" style="max-width:430px;margin:16px 0 14px">
         <label for="modeImpor">Cara memasukkan</label>
         <select id="modeImpor">
-          <option value="tambah">Tambah / perbarui — butir lain tetap ada</option>
+          <option value="tambah">Tambah / perbarui (butir lain tetap ada)</option>
           <option value="ganti">Ganti seluruh bank soal dengan daftar ini</option>
         </select>
       </div>
@@ -2737,11 +2738,11 @@
                 </td>
                 <td>
                   <select class="impor-kunci${s.a >= 0 ? '' : ' perlu-isi'}" data-n="${i}">
-                    <option value="-1"${s.a >= 0 ? '' : ' selected'}>— pilih —</option>
+                    <option value="-1"${s.a >= 0 ? '' : ' selected'}>pilih kunci</option>
                     ${s.o.map((o, n) => `<option value="${n}"${s.a === n ? ' selected' : ''}>${BENTUK[n]} ${'ABCD'[n]}</option>`).join('')}
                   </select>
                 </td>
-                <td><input class="impor-grup" data-n="${i}" value="${aman(s.grup)}" placeholder="—" /></td>
+                <td><input class="impor-grup" data-n="${i}" value="${aman(s.grup)}" placeholder="-" /></td>
                 <td class="bebas"><input class="impor-bahas" data-n="${i}" value="${aman(s.bahas)}" placeholder="opsional" /></td>
                 <td>${s.baru ? '<span class="tanda-baru">baru</span>' : 'sudah ada'}</td>
               </tr>`).join('')}
@@ -2821,7 +2822,7 @@
       gambarBank();
       sesiTergambar = null;
       gambarKendaliSesi();
-      $('#pesanBank').innerHTML = '<div class="pesan pesan-info">Bank soal tersimpan — ' +
+      $('#pesanBank').innerHTML = '<div class="pesan pesan-info">Bank soal tersimpan: ' +
         baru.length + ' butir, ' + grup + ' grup unik. Peserta yang masuk sesudah ini langsung memakainya.</div>';
     } catch (e) {
       console.error('[bank] gagal menyimpan bank soal:', e);
@@ -2841,19 +2842,19 @@
         <div class="label-sudut">Bantuan</div>
         <h1 class="judul-halaman">Ada kendala saat <em>mengerjakan</em>?</h1>
         <div class="kartu">
-          <p class="ket-halaman"><b style="color:#fff">Token ditolak.</b><br>
+          <p class="ket-halaman"><b class="tegas">Token ditolak.</b><br>
             Token hanya berlaku pada sesi yang sedang dibuka panitia. Pastikan tidak ada spasi
             di awal atau akhir; huruf besar/kecil tidak berpengaruh.</p>
-          <p class="ket-halaman"><b style="color:#fff">Layar lobi belum berubah.</b><br>
+          <p class="ket-halaman"><b class="tegas">Layar lobi belum berubah.</b><br>
             Biarkan halaman terbuka. Begitu panitia menekan tombol buka, layar berganti sendiri
             tanpa perlu dimuat ulang.</p>
-          <p class="ket-halaman"><b style="color:#fff">Akun ini disebut sudah mengerjakan.</b><br>
+          <p class="ket-halaman"><b class="tegas">Akun ini disebut sudah mengerjakan.</b><br>
             Satu akun hanya bisa satu kali per sesi. Bila Anda merasa belum pernah mengisi,
             laporkan ke panitia agar datanya diperiksa.</p>
-          <p class="ket-halaman"><b style="color:#fff">Halaman tertutup di tengah ujian.</b><br>
-            Buka kembali alamat yang sama di peramban dan perangkat yang sama — soal yang sudah
+          <p class="ket-halaman"><b class="tegas">Halaman tertutup di tengah ujian.</b><br>
+            Buka kembali alamat yang sama di peramban dan perangkat yang sama. Soal yang sudah
             dijawab beserta poinnya dipulihkan. Hitung mundur tetap berjalan selama itu.</p>
-          <p class="ket-halaman"><b style="color:#fff">Nilai gagal terkirim.</b><br>
+          <p class="ket-halaman"><b class="tegas">Nilai gagal terkirim.</b><br>
             Layar hasil akan memberi tahu bila pengiriman gagal. Jangan tutup halaman; tunjukkan
             layar tersebut ke panitia.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">

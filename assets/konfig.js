@@ -18,9 +18,9 @@ window.KONFIG = {
   // jenisnya di Ruang Admin sebelum membuka sesi.
   jenisTes: {
     pre:  { label: "Pre-Test",  panjang: "Pre-Test BIMTEK eMonDAK",
-            ket: "Diambil SEBELUM materi bimtek — mengukur pemahaman awal peserta." },
+            ket: "Diambil SEBELUM materi bimtek, untuk mengukur pemahaman awal peserta." },
     post: { label: "Post-Test", panjang: "Post-Test BIMTEK eMonDAK",
-            ket: "Diambil SESUDAH materi bimtek — mengukur perubahan pemahaman peserta." }
+            ket: "Diambil SESUDAH materi bimtek, untuk mengukur perubahan pemahaman peserta." }
   },
 
   // ── Latar beranda ─────────────────────────────────────────────────

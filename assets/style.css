@@ -466,7 +466,7 @@ a:hover { color: var(--kuning); }
 .btn:hover { transform: translateY(-1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .btn-biru {
-  background: linear-gradient(180deg, #2f80e0, var(--biru));
+  background: linear-gradient(180deg, #2a6fd0, var(--biru));
   color: #ffffff; border-color: var(--biru-tua); box-shadow: var(--bayang);
 }
 .btn-kuning {
@@ -693,10 +693,12 @@ a:hover { color: var(--kuning); }
 .ubin .bentuk { font-size: 24px; line-height: 1; flex: none; opacity: .9; }
 .ubin .ubin-teks { flex: 1; }
 
-.ubin.merah  { background: linear-gradient(180deg, #f2606f, #d5303f); }
-.ubin.biru   { background: linear-gradient(180deg, #3f9bf0, #1a63bd); }
+/* Warna ubin digelapkan secukupnya supaya teks putih lolos kontras 4,5:1
+   di seluruh gradasi (dulu bagian atasnya hanya 2,9–3,6:1). */
+.ubin.merah  { background: linear-gradient(180deg, #cf3442, #bf2d3a); }
+.ubin.biru   { background: linear-gradient(180deg, #2a6fd0, #1a63bd); }
 .ubin.kuning { background: linear-gradient(180deg, #f7cb52, #dfa112); color: #26200c; }
-.ubin.hijau  { background: linear-gradient(180deg, #35c47f, #10935b); }
+.ubin.hijau  { background: linear-gradient(180deg, #168050, #127245); }
 
 @keyframes ubinMasuk {
   from { opacity: 0; transform: translateY(22px) scale(.96); }
@@ -843,6 +845,9 @@ a:hover { color: var(--kuning); }
   .podium .juara1 { order: 2; }
   .podium .juara2 { order: 1; }
   .podium .juara3 { order: 3; }
+  /* Juara baru satu atau dua: kolomnya dikurangi supaya podium tetap di tengah. */
+  .podium.isi-2 { grid-template-columns: repeat(2, minmax(0, 340px)); justify-content: center; }
+  .podium.isi-1 { grid-template-columns: minmax(0, 380px); justify-content: center; }
 }
 
 .mimbar {
@@ -970,6 +975,15 @@ table.tabel-impor td { vertical-align: top; }
 @media print { .pilih-tampilan { display: none !important; } }
 /* di ponsel pita mode lokal naik satu baris supaya tidak menumpuk */
 @media (max-width: 620px) { .pita-lokal { bottom: 60px; right: 12px; } }
+
+/* Target sentuh minimal 44px di layar sentuh. Di layar bertetikus tombol
+   kecil tetap ringkas. */
+@media (pointer: coarse) {
+  .pilih-tampilan button, .chip, .btn-kecil { min-height: 44px; }
+  .pilih-tampilan button { min-width: 56px; }
+  .tombol-hapus, .tombol-suara { width: 44px; height: 44px; }
+  .nav-kanan a { padding: 10px 0; }
+}
 
 /* ── rekap per sesi (Ruang Admin) ── */
 .saring-rekap { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
